@@ -151,7 +151,37 @@ public final class ShopService {
                                              double decayPerStep,
                                              double inactivitySellDrop,
                                              double inactivityBuyRise) {
-        ShopRecord shop = getLookedAtShop(player);
+        configureDynamicTradeAt(
+                player,
+                getLookedAtShopPosOrThrow(player),
+                index,
+                baseSellPrice,
+                baseBuyPrice,
+                minSellPrice,
+                maxSellPrice,
+                minBuyPrice,
+                maxBuyPrice,
+                elasticity,
+                decayPerStep,
+                inactivitySellDrop,
+                inactivityBuyRise
+        );
+    }
+
+    public static void configureDynamicTradeAt(ServerPlayer player,
+                                               BlockPos pos,
+                                               int index,
+                                               long baseSellPrice,
+                                               long baseBuyPrice,
+                                               long minSellPrice,
+                                               long maxSellPrice,
+                                               long minBuyPrice,
+                                               long maxBuyPrice,
+                                               double elasticity,
+                                               double decayPerStep,
+                                               double inactivitySellDrop,
+                                               double inactivityBuyRise) {
+        ShopRecord shop = getShopAt(player, pos);
 
         if (!shop.isAdminShop()) {
             throw new IllegalStateException("Динамические цены доступны только админ-магазину.");

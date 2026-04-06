@@ -1,7 +1,9 @@
 package com.settlements.world.menu;
 
 import com.settlements.data.SettlementSavedData;
+import com.settlements.data.model.PriceMode;
 import com.settlements.data.model.ShopRecord;
+import com.settlements.data.model.ShopTradeEntry;
 import com.settlements.registry.ModBlocks;
 import com.settlements.registry.ModMenuTypes;
 import com.settlements.service.ShopService;
@@ -24,6 +26,7 @@ import net.minecraftforge.registries.ForgeRegistries;
 
 public class ShopManagementMenu extends AbstractContainerMenu {
     private static final int SLOT_SELECTED_TRADE = 0;
+
     public static final int BUTTON_TOGGLE_ENABLED = 0;
     public static final int BUTTON_OPEN_STORAGE = 1;
     public static final int BUTTON_DEPOSIT_ALL = 2;
@@ -63,6 +66,23 @@ public class ShopManagementMenu extends AbstractContainerMenu {
 
     public static final int BUTTON_TOGGLE_TRADE_MODE = 32;
 
+    public static final int BUTTON_DYNAMIC_MIN_SELL_MINUS_1 = 33;
+    public static final int BUTTON_DYNAMIC_MIN_SELL_PLUS_1 = 34;
+    public static final int BUTTON_DYNAMIC_MAX_SELL_MINUS_1 = 35;
+    public static final int BUTTON_DYNAMIC_MAX_SELL_PLUS_1 = 36;
+    public static final int BUTTON_DYNAMIC_MIN_BUY_MINUS_1 = 37;
+    public static final int BUTTON_DYNAMIC_MIN_BUY_PLUS_1 = 38;
+    public static final int BUTTON_DYNAMIC_MAX_BUY_MINUS_1 = 39;
+    public static final int BUTTON_DYNAMIC_MAX_BUY_PLUS_1 = 40;
+    public static final int BUTTON_DYNAMIC_ELASTICITY_MINUS = 41;
+    public static final int BUTTON_DYNAMIC_ELASTICITY_PLUS = 42;
+    public static final int BUTTON_DYNAMIC_DECAY_MINUS = 43;
+    public static final int BUTTON_DYNAMIC_DECAY_PLUS = 44;
+    public static final int BUTTON_DYNAMIC_INACTIVITY_SELL_MINUS = 45;
+    public static final int BUTTON_DYNAMIC_INACTIVITY_SELL_PLUS = 46;
+    public static final int BUTTON_DYNAMIC_INACTIVITY_BUY_MINUS = 47;
+    public static final int BUTTON_DYNAMIC_INACTIVITY_BUY_PLUS = 48;
+
     private static final int DATA_BALANCE_LOW = 0;
     private static final int DATA_BALANCE_HIGH = 1;
     private static final int DATA_ENABLED = 2;
@@ -82,7 +102,19 @@ public class ShopManagementMenu extends AbstractContainerMenu {
     private static final int DATA_SELECTED_BUY_PRICE_LOW = 16;
     private static final int DATA_SELECTED_BUY_PRICE_HIGH = 17;
     private static final int DATA_SELECTED_DYNAMIC = 18;
-    private static final int DATA_COUNT = 19;
+    private static final int DATA_SELECTED_MIN_SELL_LOW = 19;
+    private static final int DATA_SELECTED_MIN_SELL_HIGH = 20;
+    private static final int DATA_SELECTED_MAX_SELL_LOW = 21;
+    private static final int DATA_SELECTED_MAX_SELL_HIGH = 22;
+    private static final int DATA_SELECTED_MIN_BUY_LOW = 23;
+    private static final int DATA_SELECTED_MIN_BUY_HIGH = 24;
+    private static final int DATA_SELECTED_MAX_BUY_LOW = 25;
+    private static final int DATA_SELECTED_MAX_BUY_HIGH = 26;
+    private static final int DATA_SELECTED_ELASTICITY_SCALED = 27;
+    private static final int DATA_SELECTED_DECAY_SCALED = 28;
+    private static final int DATA_SELECTED_INACTIVITY_SELL_SCALED = 29;
+    private static final int DATA_SELECTED_INACTIVITY_BUY_SCALED = 30;
+    private static final int DATA_COUNT = 31;
 
     private final BlockPos shopPos;
     private final String shopName;
@@ -180,9 +212,8 @@ public class ShopManagementMenu extends AbstractContainerMenu {
             public int get(int index) {
                 ShopRecord shop = getShop();
                 long balance = shop == null ? 0L : shop.getBalance();
-                ShopRecord currentShop = getShop();
                 int selectedIndex = getSelectedIndex();
-                com.settlements.data.model.ShopTradeEntry trade = currentShop == null ? null : currentShop.getTradeByHumanIndex(selectedIndex);
+                ShopTradeEntry trade = shop == null ? null : shop.getTradeByHumanIndex(selectedIndex);
 
                 if (index == DATA_BALANCE_LOW) {
                     return (int) (balance & 0xFFFFFFFFL);
@@ -206,10 +237,10 @@ public class ShopManagementMenu extends AbstractContainerMenu {
                     return shop != null && shop.isIndestructible() ? 1 : 0;
                 }
                 if (index == DATA_SELECTED_TRADE_INDEX) {
-                    return currentShop == null || currentShop.getTrades().isEmpty() ? 0 : selectedIndex;
+                    return shop == null || shop.getTrades().isEmpty() ? 0 : selectedIndex;
                 }
                 if (index == DATA_TRADE_COUNT) {
-                    return currentShop == null ? 0 : currentShop.getTrades().size();
+                    return shop == null ? 0 : shop.getTrades().size();
                 }
                 if (index == DATA_SELECTED_TRADE_ENABLED) {
                     return trade != null && trade.isEnabled() ? 1 : 0;
@@ -243,7 +274,51 @@ public class ShopManagementMenu extends AbstractContainerMenu {
                     return (int) ((value >>> 32) & 0xFFFFFFFFL);
                 }
                 if (index == DATA_SELECTED_DYNAMIC) {
-                    return trade != null && trade.getPriceMode() == com.settlements.data.model.PriceMode.DYNAMIC ? 1 : 0;
+                    return trade != null && trade.getPriceMode() == PriceMode.DYNAMIC ? 1 : 0;
+                }
+                if (index == DATA_SELECTED_MIN_SELL_LOW) {
+                    long value = trade == null ? 0L : trade.getMinSellPrice();
+                    return (int) (value & 0xFFFFFFFFL);
+                }
+                if (index == DATA_SELECTED_MIN_SELL_HIGH) {
+                    long value = trade == null ? 0L : trade.getMinSellPrice();
+                    return (int) ((value >>> 32) & 0xFFFFFFFFL);
+                }
+                if (index == DATA_SELECTED_MAX_SELL_LOW) {
+                    long value = trade == null ? 0L : trade.getMaxSellPrice();
+                    return (int) (value & 0xFFFFFFFFL);
+                }
+                if (index == DATA_SELECTED_MAX_SELL_HIGH) {
+                    long value = trade == null ? 0L : trade.getMaxSellPrice();
+                    return (int) ((value >>> 32) & 0xFFFFFFFFL);
+                }
+                if (index == DATA_SELECTED_MIN_BUY_LOW) {
+                    long value = trade == null ? 0L : trade.getMinBuyPrice();
+                    return (int) (value & 0xFFFFFFFFL);
+                }
+                if (index == DATA_SELECTED_MIN_BUY_HIGH) {
+                    long value = trade == null ? 0L : trade.getMinBuyPrice();
+                    return (int) ((value >>> 32) & 0xFFFFFFFFL);
+                }
+                if (index == DATA_SELECTED_MAX_BUY_LOW) {
+                    long value = trade == null ? 0L : trade.getMaxBuyPrice();
+                    return (int) (value & 0xFFFFFFFFL);
+                }
+                if (index == DATA_SELECTED_MAX_BUY_HIGH) {
+                    long value = trade == null ? 0L : trade.getMaxBuyPrice();
+                    return (int) ((value >>> 32) & 0xFFFFFFFFL);
+                }
+                if (index == DATA_SELECTED_ELASTICITY_SCALED) {
+                    return scaleDouble(trade == null ? 0.0D : trade.getElasticity());
+                }
+                if (index == DATA_SELECTED_DECAY_SCALED) {
+                    return scaleDouble(trade == null ? 0.0D : trade.getDecayPerStep());
+                }
+                if (index == DATA_SELECTED_INACTIVITY_SELL_SCALED) {
+                    return scaleDouble(trade == null ? 0.0D : trade.getInactivitySellDrop());
+                }
+                if (index == DATA_SELECTED_INACTIVITY_BUY_SCALED) {
+                    return scaleDouble(trade == null ? 0.0D : trade.getInactivityBuyRise());
                 }
 
                 return 0;
@@ -258,6 +333,10 @@ public class ShopManagementMenu extends AbstractContainerMenu {
                 return DATA_COUNT;
             }
         };
+    }
+
+    private static int scaleDouble(double value) {
+        return (int) Math.round(value * 1000.0D);
     }
 
     private void addPlayerInventorySlots(Inventory playerInventory) {
@@ -354,6 +433,46 @@ public class ShopManagementMenu extends AbstractContainerMenu {
         return menuData.get(DATA_SELECTED_DYNAMIC) != 0;
     }
 
+    public long getSelectedTradeMinSellPrice() {
+        long low = Integer.toUnsignedLong(menuData.get(DATA_SELECTED_MIN_SELL_LOW));
+        long high = Integer.toUnsignedLong(menuData.get(DATA_SELECTED_MIN_SELL_HIGH));
+        return low | (high << 32);
+    }
+
+    public long getSelectedTradeMaxSellPrice() {
+        long low = Integer.toUnsignedLong(menuData.get(DATA_SELECTED_MAX_SELL_LOW));
+        long high = Integer.toUnsignedLong(menuData.get(DATA_SELECTED_MAX_SELL_HIGH));
+        return low | (high << 32);
+    }
+
+    public long getSelectedTradeMinBuyPrice() {
+        long low = Integer.toUnsignedLong(menuData.get(DATA_SELECTED_MIN_BUY_LOW));
+        long high = Integer.toUnsignedLong(menuData.get(DATA_SELECTED_MIN_BUY_HIGH));
+        return low | (high << 32);
+    }
+
+    public long getSelectedTradeMaxBuyPrice() {
+        long low = Integer.toUnsignedLong(menuData.get(DATA_SELECTED_MAX_BUY_LOW));
+        long high = Integer.toUnsignedLong(menuData.get(DATA_SELECTED_MAX_BUY_HIGH));
+        return low | (high << 32);
+    }
+
+    public double getSelectedTradeElasticity() {
+        return menuData.get(DATA_SELECTED_ELASTICITY_SCALED) / 1000.0D;
+    }
+
+    public double getSelectedTradeDecayPerStep() {
+        return menuData.get(DATA_SELECTED_DECAY_SCALED) / 1000.0D;
+    }
+
+    public double getSelectedTradeInactivitySellDrop() {
+        return menuData.get(DATA_SELECTED_INACTIVITY_SELL_SCALED) / 1000.0D;
+    }
+
+    public double getSelectedTradeInactivityBuyRise() {
+        return menuData.get(DATA_SELECTED_INACTIVITY_BUY_SCALED) / 1000.0D;
+    }
+
     public ItemStack getSelectedTradeDisplayStack() {
         return selectedTradeDisplay.getItem(0);
     }
@@ -399,11 +518,11 @@ public class ShopManagementMenu extends AbstractContainerMenu {
             selectedTradeIndex = shop.getTrades().size();
         }
 
-        com.settlements.data.model.ShopTradeEntry trade = shop.getTradeByHumanIndex(selectedTradeIndex);
+        ShopTradeEntry trade = shop.getTradeByHumanIndex(selectedTradeIndex);
         selectedTradeDisplay.setItem(0, buildDisplayStack(trade));
     }
 
-    private ItemStack buildDisplayStack(com.settlements.data.model.ShopTradeEntry trade) {
+    private ItemStack buildDisplayStack(ShopTradeEntry trade) {
         if (trade == null) {
             return ItemStack.EMPTY;
         }
@@ -419,6 +538,153 @@ public class ShopManagementMenu extends AbstractContainerMenu {
         }
 
         return new ItemStack(item);
+    }
+
+    private ShopTradeEntry getSelectedTrade(ServerPlayer serverPlayer) {
+        ShopRecord shop = SettlementSavedData.get(serverPlayer.server).getShopByPos(serverPlayer.level(), shopPos);
+        if (shop == null) {
+            throw new IllegalStateException("Магазин не найден.");
+        }
+
+        ShopTradeEntry trade = shop.getTradeByHumanIndex(selectedTradeIndex);
+        if (trade == null) {
+            throw new IllegalStateException("Сделка не найдена.");
+        }
+
+        return trade;
+    }
+
+    private void adjustDynamicTrade(ServerPlayer serverPlayer, int buttonId) {
+        ShopTradeEntry trade = getSelectedTrade(serverPlayer);
+
+        if (!isAdminShop()) {
+            throw new IllegalStateException("Динамический режим доступен только у админ-магазина.");
+        }
+        if (trade.getPriceMode() != PriceMode.DYNAMIC) {
+            throw new IllegalStateException("Сначала включи динамический режим сделки.");
+        }
+
+        long baseSellPrice = trade.canSellToPlayer() ? Math.max(1L, trade.getSellPrice()) : 0L;
+        long baseBuyPrice = trade.canBuyFromPlayer() ? Math.max(1L, trade.getBuyPrice()) : 0L;
+
+        long minSellPrice = trade.canSellToPlayer() ? Math.max(1L, trade.getMinSellPrice()) : 1L;
+        long maxSellPrice = trade.canSellToPlayer() ? Math.max(1L, trade.getMaxSellPrice()) : 1L;
+        long minBuyPrice = trade.canBuyFromPlayer() ? Math.max(1L, trade.getMinBuyPrice()) : 1L;
+        long maxBuyPrice = trade.canBuyFromPlayer() ? Math.max(1L, trade.getMaxBuyPrice()) : 1L;
+
+        double elasticity = trade.getElasticity();
+        double decayPerStep = trade.getDecayPerStep();
+        double inactivitySellDrop = trade.getInactivitySellDrop();
+        double inactivityBuyRise = trade.getInactivityBuyRise();
+
+        if (buttonId == BUTTON_DYNAMIC_MIN_SELL_MINUS_1) {
+            minSellPrice--;
+        } else if (buttonId == BUTTON_DYNAMIC_MIN_SELL_PLUS_1) {
+            minSellPrice++;
+        } else if (buttonId == BUTTON_DYNAMIC_MAX_SELL_MINUS_1) {
+            maxSellPrice--;
+        } else if (buttonId == BUTTON_DYNAMIC_MAX_SELL_PLUS_1) {
+            maxSellPrice++;
+        } else if (buttonId == BUTTON_DYNAMIC_MIN_BUY_MINUS_1) {
+            minBuyPrice--;
+        } else if (buttonId == BUTTON_DYNAMIC_MIN_BUY_PLUS_1) {
+            minBuyPrice++;
+        } else if (buttonId == BUTTON_DYNAMIC_MAX_BUY_MINUS_1) {
+            maxBuyPrice--;
+        } else if (buttonId == BUTTON_DYNAMIC_MAX_BUY_PLUS_1) {
+            maxBuyPrice++;
+        } else if (buttonId == BUTTON_DYNAMIC_ELASTICITY_MINUS) {
+            elasticity -= 0.01D;
+        } else if (buttonId == BUTTON_DYNAMIC_ELASTICITY_PLUS) {
+            elasticity += 0.01D;
+        } else if (buttonId == BUTTON_DYNAMIC_DECAY_MINUS) {
+            decayPerStep -= 0.01D;
+        } else if (buttonId == BUTTON_DYNAMIC_DECAY_PLUS) {
+            decayPerStep += 0.01D;
+        } else if (buttonId == BUTTON_DYNAMIC_INACTIVITY_SELL_MINUS) {
+            inactivitySellDrop -= 0.01D;
+        } else if (buttonId == BUTTON_DYNAMIC_INACTIVITY_SELL_PLUS) {
+            inactivitySellDrop += 0.01D;
+        } else if (buttonId == BUTTON_DYNAMIC_INACTIVITY_BUY_MINUS) {
+            inactivityBuyRise -= 0.01D;
+        } else if (buttonId == BUTTON_DYNAMIC_INACTIVITY_BUY_PLUS) {
+            inactivityBuyRise += 0.01D;
+        } else {
+            return;
+        }
+
+        if (trade.canSellToPlayer()) {
+            if (minSellPrice < 1L) {
+                minSellPrice = 1L;
+            }
+            if (maxSellPrice < 1L) {
+                maxSellPrice = 1L;
+            }
+            if (minSellPrice > baseSellPrice) {
+                minSellPrice = baseSellPrice;
+            }
+            if (maxSellPrice < baseSellPrice) {
+                maxSellPrice = baseSellPrice;
+            }
+            if (minSellPrice > maxSellPrice) {
+                minSellPrice = maxSellPrice;
+            }
+        } else {
+            minSellPrice = 1L;
+            maxSellPrice = 1L;
+        }
+
+        if (trade.canBuyFromPlayer()) {
+            if (minBuyPrice < 1L) {
+                minBuyPrice = 1L;
+            }
+            if (maxBuyPrice < 1L) {
+                maxBuyPrice = 1L;
+            }
+            if (minBuyPrice > baseBuyPrice) {
+                minBuyPrice = baseBuyPrice;
+            }
+            if (maxBuyPrice < baseBuyPrice) {
+                maxBuyPrice = baseBuyPrice;
+            }
+            if (minBuyPrice > maxBuyPrice) {
+                minBuyPrice = maxBuyPrice;
+            }
+        } else {
+            minBuyPrice = 1L;
+            maxBuyPrice = 1L;
+        }
+
+        elasticity = clamp(elasticity, 0.0D, 10.0D);
+        decayPerStep = clamp(decayPerStep, 0.0D, 1.0D);
+        inactivitySellDrop = clamp(inactivitySellDrop, 0.0D, 10.0D);
+        inactivityBuyRise = clamp(inactivityBuyRise, 0.0D, 10.0D);
+
+        ShopService.configureDynamicTradeAt(
+                serverPlayer,
+                shopPos,
+                selectedTradeIndex,
+                baseSellPrice,
+                baseBuyPrice,
+                minSellPrice,
+                maxSellPrice,
+                minBuyPrice,
+                maxBuyPrice,
+                elasticity,
+                decayPerStep,
+                inactivitySellDrop,
+                inactivityBuyRise
+        );
+    }
+
+    private double clamp(double value, double min, double max) {
+        if (value < min) {
+            return min;
+        }
+        if (value > max) {
+            return max;
+        }
+        return value;
     }
 
     @Override
@@ -612,6 +878,11 @@ public class ShopManagementMenu extends AbstractContainerMenu {
             }
             if (buttonId == BUTTON_TOGGLE_TRADE_MODE) {
                 ShopService.toggleTradePriceModeAt(serverPlayer, shopPos, selectedTradeIndex);
+                refreshTradeDisplay(player);
+                return true;
+            }
+            if (buttonId >= BUTTON_DYNAMIC_MIN_SELL_MINUS_1 && buttonId <= BUTTON_DYNAMIC_INACTIVITY_BUY_PLUS) {
+                adjustDynamicTrade(serverPlayer, buttonId);
                 refreshTradeDisplay(player);
                 return true;
             }
