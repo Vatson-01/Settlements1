@@ -8,6 +8,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 
+import java.util.Arrays;
+
 public class ShopManagementScreen extends AbstractContainerScreen<ShopManagementMenu> {
     private Button toggleEnabledButton;
     private Button openStorageButton;
@@ -49,7 +51,7 @@ public class ShopManagementScreen extends AbstractContainerScreen<ShopManagement
 
     public ShopManagementScreen(ShopManagementMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
-        this.imageWidth = 430;
+        this.imageWidth = 444;
         this.imageHeight = 310;
         this.inventoryLabelY = 218;
     }
@@ -110,87 +112,87 @@ public class ShopManagementScreen extends AbstractContainerScreen<ShopManagement
                 .build());
 
         infiniteStockButton = addRenderableWidget(Button.builder(Component.literal("∞ Склад"), b -> press(ShopManagementMenu.BUTTON_TOGGLE_INFINITE_STOCK))
-                .bounds(left + 320, top + 12, 102, 20)
+                .bounds(left + 324, top + 12, 110, 20)
                 .build());
 
         infiniteBalanceButton = addRenderableWidget(Button.builder(Component.literal("∞ Баланс"), b -> press(ShopManagementMenu.BUTTON_TOGGLE_INFINITE_BALANCE))
-                .bounds(left + 320, top + 36, 102, 20)
+                .bounds(left + 324, top + 36, 110, 20)
                 .build());
 
         indestructibleButton = addRenderableWidget(Button.builder(Component.literal("Неразр."), b -> press(ShopManagementMenu.BUTTON_TOGGLE_INDESTRUCTIBLE))
-                .bounds(left + 320, top + 60, 102, 20)
+                .bounds(left + 324, top + 60, 110, 20)
                 .build());
 
-        addSellTradeButton = addRenderableWidget(Button.builder(Component.literal("Продажа"), b -> press(ShopManagementMenu.BUTTON_ADD_SELL_TRADE))
-                .bounds(left + 184, top + 84, 72, 20)
+        addSellTradeButton = addRenderableWidget(Button.builder(Component.literal("Продать"), b -> press(ShopManagementMenu.BUTTON_ADD_SELL_TRADE))
+                .bounds(left + 184, top + 96, 76, 20)
                 .build());
 
-        addBuyTradeButton = addRenderableWidget(Button.builder(Component.literal("Скупка"), b -> press(ShopManagementMenu.BUTTON_ADD_BUY_TRADE))
-                .bounds(left + 260, top + 84, 72, 20)
+        addBuyTradeButton = addRenderableWidget(Button.builder(Component.literal("Скупать"), b -> press(ShopManagementMenu.BUTTON_ADD_BUY_TRADE))
+                .bounds(left + 264, top + 96, 76, 20)
                 .build());
 
         addDualTradeButton = addRenderableWidget(Button.builder(Component.literal("Обе"), b -> press(ShopManagementMenu.BUTTON_ADD_DUAL_TRADE))
-                .bounds(left + 336, top + 84, 86, 20)
+                .bounds(left + 344, top + 96, 90, 20)
                 .build());
 
         removeTradeButton = addRenderableWidget(Button.builder(Component.literal("Удалить"), b -> press(ShopManagementMenu.BUTTON_REMOVE_TRADE))
-                .bounds(left + 184, top + 108, 116, 20)
+                .bounds(left + 184, top + 120, 116, 20)
                 .build());
 
         toggleTradeEnabledButton = addRenderableWidget(Button.builder(Component.literal("Сделка"), b -> press(ShopManagementMenu.BUTTON_TOGGLE_TRADE_ENABLED))
-                .bounds(left + 306, top + 108, 116, 20)
+                .bounds(left + 306, top + 120, 128, 20)
                 .build());
 
         toggleTradeModeButton = addRenderableWidget(Button.builder(Component.literal("Режим"), b -> press(ShopManagementMenu.BUTTON_TOGGLE_TRADE_MODE))
-                .bounds(left + 306, top + 132, 116, 20)
+                .bounds(left + 306, top + 144, 128, 20)
                 .build());
 
         sellPriceMinus1Button = addRenderableWidget(Button.builder(Component.literal("-1"), b -> press(ShopManagementMenu.BUTTON_SELL_PRICE_MINUS_1))
-                .bounds(left + 310, top + 136, 26, 20)
+                .bounds(left + 322, top + 144, 26, 20)
                 .build());
 
         sellPricePlus1Button = addRenderableWidget(Button.builder(Component.literal("+1"), b -> press(ShopManagementMenu.BUTTON_SELL_PRICE_PLUS_1))
-                .bounds(left + 338, top + 136, 26, 20)
+                .bounds(left + 350, top + 144, 26, 20)
                 .build());
 
         sellPriceMinus10Button = addRenderableWidget(Button.builder(Component.literal("-10"), b -> press(ShopManagementMenu.BUTTON_SELL_PRICE_MINUS_10))
-                .bounds(left + 366, top + 136, 26, 20)
+                .bounds(left + 378, top + 144, 26, 20)
                 .build());
 
         sellPricePlus10Button = addRenderableWidget(Button.builder(Component.literal("+10"), b -> press(ShopManagementMenu.BUTTON_SELL_PRICE_PLUS_10))
-                .bounds(left + 394, top + 136, 28, 20)
+                .bounds(left + 406, top + 144, 26, 20)
                 .build());
 
         buyPriceMinus1Button = addRenderableWidget(Button.builder(Component.literal("-1"), b -> press(ShopManagementMenu.BUTTON_BUY_PRICE_MINUS_1))
-                .bounds(left + 310, top + 160, 26, 20)
+                .bounds(left + 322, top + 166, 26, 20)
                 .build());
 
         buyPricePlus1Button = addRenderableWidget(Button.builder(Component.literal("+1"), b -> press(ShopManagementMenu.BUTTON_BUY_PRICE_PLUS_1))
-                .bounds(left + 338, top + 160, 26, 20)
+                .bounds(left + 350, top + 166, 26, 20)
                 .build());
 
         buyPriceMinus10Button = addRenderableWidget(Button.builder(Component.literal("-10"), b -> press(ShopManagementMenu.BUTTON_BUY_PRICE_MINUS_10))
-                .bounds(left + 366, top + 160, 26, 20)
+                .bounds(left + 378, top + 166, 26, 20)
                 .build());
 
         buyPricePlus10Button = addRenderableWidget(Button.builder(Component.literal("+10"), b -> press(ShopManagementMenu.BUTTON_BUY_PRICE_PLUS_10))
-                .bounds(left + 394, top + 160, 28, 20)
+                .bounds(left + 406, top + 166, 26, 20)
                 .build());
 
         sellBatchMinusButton = addRenderableWidget(Button.builder(Component.literal("-"), b -> press(ShopManagementMenu.BUTTON_SELL_BATCH_MINUS_1))
-                .bounds(left + 368, top + 184, 26, 20)
+                .bounds(left + 378, top + 188, 26, 20)
                 .build());
 
         sellBatchPlusButton = addRenderableWidget(Button.builder(Component.literal("+"), b -> press(ShopManagementMenu.BUTTON_SELL_BATCH_PLUS_1))
-                .bounds(left + 396, top + 184, 26, 20)
+                .bounds(left + 406, top + 188, 26, 20)
                 .build());
 
         buyBatchMinusButton = addRenderableWidget(Button.builder(Component.literal("-"), b -> press(ShopManagementMenu.BUTTON_BUY_BATCH_MINUS_1))
-                .bounds(left + 368, top + 208, 26, 20)
+                .bounds(left + 378, top + 200, 26, 20)
                 .build());
 
         buyBatchPlusButton = addRenderableWidget(Button.builder(Component.literal("+"), b -> press(ShopManagementMenu.BUTTON_BUY_BATCH_PLUS_1))
-                .bounds(left + 396, top + 208, 26, 20)
+                .bounds(left + 406, top + 200, 26, 20)
                 .build());
 
         updateButtons();
@@ -299,19 +301,21 @@ public class ShopManagementScreen extends AbstractContainerScreen<ShopManagement
         ItemStack selected = this.menu.getSelectedTradeDisplayStack();
         String tradeName = selected.isEmpty() ? "Нет сделки" : selected.getHoverName().getString();
 
-        graphics.drawString(this.font, trimToWidth(tradeName, 100), 212, 42, 0xFFFFFF, false);
+        graphics.drawString(this.font, trimToWidth(tradeName, 102), 212, 42, 0xFFFFFF, false);
         graphics.drawString(this.font, "Статус: " + selectedTradeStatus(), 212, 54, 0xD8D8D8, false);
         graphics.drawString(this.font, "Тип: " + selectedTradeType(), 212, 66, 0xD8D8D8, false);
+        graphics.drawString(this.font, "ЛКМ по иконке", 212, 78, 0xC8C8C8, false);
+        graphics.drawString(this.font, "сменить предмет", 212, 88, 0xC8C8C8, false);
 
-        graphics.drawString(this.font, "Продажа: " + tradeValueText(this.menu.selectedTradeCanSell(), this.menu.getSelectedTradeSellPrice()), 184, 142, 0xFFFFFF, false);
-        graphics.drawString(this.font, "Скупка: " + tradeValueText(this.menu.selectedTradeCanBuy(), this.menu.getSelectedTradeBuyPrice()), 184, 166, 0xFFFFFF, false);
-        graphics.drawString(this.font, "Пачка прод.: " + batchText(this.menu.selectedTradeCanSell(), this.menu.getSelectedTradeSellBatch()), 184, 190, 0xFFFFFF, false);
-        graphics.drawString(this.font, "Пачка скуп.: " + batchText(this.menu.selectedTradeCanBuy(), this.menu.getSelectedTradeBuyBatch()), 184, 214, 0xFFFFFF, false);
+        graphics.drawString(this.font, "Продажа: " + tradeValueText(this.menu.selectedTradeCanSell(), this.menu.getSelectedTradeSellPrice()), 184, 150, 0xFFFFFF, false);
+        graphics.drawString(this.font, "Скупка: " + tradeValueText(this.menu.selectedTradeCanBuy(), this.menu.getSelectedTradeBuyPrice()), 184, 172, 0xFFFFFF, false);
+        graphics.drawString(this.font, "Пачка прод.: " + batchText(this.menu.selectedTradeCanSell(), this.menu.getSelectedTradeSellBatch()), 184, 194, 0xFFFFFF, false);
+        graphics.drawString(this.font, "Пачка скуп.: " + batchText(this.menu.selectedTradeCanBuy(), this.menu.getSelectedTradeBuyBatch()), 184, 206, 0xFFFFFF, false);
 
         if (this.menu.isAdminShop()) {
-            graphics.drawString(this.font, "Тип магазина: админ", 320, 88, 0xFFD080, false);
+            graphics.drawString(this.font, "Тип магазина: админ", 324, 88, 0xFFD080, false);
         } else {
-            graphics.drawString(this.font, "Тип магазина: игрок", 320, 88, 0xA8FFA8, false);
+            graphics.drawString(this.font, "Тип магазина: игрок", 324, 88, 0xA8FFA8, false);
         }
 
         graphics.drawString(this.font, this.playerInventoryTitle, 8, this.inventoryLabelY, 0xFFFFFF, false);
@@ -379,10 +383,46 @@ public class ShopManagementScreen extends AbstractContainerScreen<ShopManagement
         return builder + ellipsis;
     }
 
+    private boolean isHoveringSelectedTradeIcon(double mouseX, double mouseY) {
+        return mouseX >= this.leftPos + 186
+                && mouseX < this.leftPos + 204
+                && mouseY >= this.topPos + 38
+                && mouseY < this.topPos + 56;
+    }
+
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         this.renderBackground(graphics);
         super.render(graphics, mouseX, mouseY, partialTick);
+
+        if (isHoveringSelectedTradeIcon(mouseX, mouseY)) {
+            if (this.menu.hasSelectedTrade()) {
+                graphics.renderTooltip(
+                        this.font,
+                        Arrays.asList(
+                                Component.literal("Возьми предмет курсором"),
+                                Component.literal("и нажми на иконку сделки,"),
+                                Component.literal("чтобы заменить товар.")
+                        ),
+                        ItemStack.EMPTY.getTooltipImage(),
+                        mouseX,
+                        mouseY
+                );
+            } else {
+                graphics.renderTooltip(
+                        this.font,
+                        Arrays.asList(
+                                Component.literal("Новые сделки создаются"),
+                                Component.literal("по предмету из главной руки.")
+                        ),
+                        ItemStack.EMPTY.getTooltipImage(),
+                        mouseX,
+                        mouseY
+                );
+            }
+            return;
+        }
+
         this.renderTooltip(graphics, mouseX, mouseY);
     }
 }

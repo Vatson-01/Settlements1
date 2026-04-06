@@ -15,6 +15,7 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.Item;
@@ -22,6 +23,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.registries.ForgeRegistries;
 
 public class ShopManagementMenu extends AbstractContainerMenu {
+    private static final int SLOT_SELECTED_TRADE = 0;
     public static final int BUTTON_TOGGLE_ENABLED = 0;
     public static final int BUTTON_OPEN_STORAGE = 1;
     public static final int BUTTON_DEPOSIT_ALL = 2;
@@ -122,7 +124,7 @@ public class ShopManagementMenu extends AbstractContainerMenu {
 
         this.addDataSlots(menuData);
 
-        this.addSlot(new Slot(selectedTradeDisplay, 0, 188, 40) {
+        this.addSlot(new Slot(selectedTradeDisplay, SLOT_SELECTED_TRADE, 188, 40) {
             @Override
             public boolean mayPlace(ItemStack stack) {
                 return false;
@@ -417,6 +419,27 @@ public class ShopManagementMenu extends AbstractContainerMenu {
         }
 
         return new ItemStack(item);
+    }
+
+    @Override
+    public void clicked(int slotId, int dragType, ClickType clickType, Player player) {
+        if (slotId == SLOT_SELECTED_TRADE
+                && clickType == ClickType.PICKUP
+                && hasSelectedTrade()
+                && !getCarried().isEmpty()) {
+            if (player instanceof ServerPlayer serverPlayer) {
+                try {
+                    ShopService.changeTradeItemAt(serverPlayer, shopPos, selectedTradeIndex, getCarried());
+                    refreshTradeDisplay(player);
+                    broadcastChanges();
+                } catch (Exception e) {
+                    serverPlayer.displayClientMessage(Component.literal(e.getMessage()), true);
+                }
+            }
+            return;
+        }
+
+        super.clicked(slotId, dragType, clickType, player);
     }
 
     @Override
