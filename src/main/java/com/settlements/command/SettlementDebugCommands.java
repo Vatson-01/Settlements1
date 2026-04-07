@@ -9,8 +9,11 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import com.settlements.SettlementsMod;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.settlements.data.SettlementSavedData;
 import com.settlements.data.model.PlotPermission;
+import com.settlements.data.model.ReconstructionSession;
+import com.settlements.service.ReconstructionService;
 import com.settlements.data.model.PlotPermissionSet;
 import com.settlements.data.model.Settlement;
 import com.settlements.data.model.SettlementMember;
@@ -75,6 +78,7 @@ public final class SettlementDebugCommands {
                         .then(buildRemoveMemberNode())
                         .then(buildWarNode())
                         .then(buildSiegeNode())
+                        .then(buildReconstructionNode())
         );
     }
 
@@ -91,7 +95,122 @@ public final class SettlementDebugCommands {
                     return 1;
                 });
     }
+    private static LiteralArgumentBuilder<CommandSourceStack> buildReconstructionNode() {
+        return Commands.literal("reconstruction")
+                .then(Commands.literal("info")
+                        .executes(SettlementDebugCommands::reconstructionInfo))
+                .then(Commands.literal("deposithand")
+                        .executes(SettlementDebugCommands::reconstructionDepositHand))
+                .then(Commands.literal("restore")
+                        .executes(SettlementDebugCommands::reconstructionRestore))
+                .then(Commands.literal("skiplooked")
+                        .executes(SettlementDebugCommands::reconstructionSkipLooked));
+    }
 
+    private static int reconstructionInfo(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+
+        final ServerPlayer player;
+        try {
+            player = source.getPlayerOrException();
+        } catch (CommandSyntaxException e) {
+            source.sendFailure(Component.literal("Эту команду может использовать только игрок."));
+            return 0;
+        }
+
+        try {
+            ReconstructionSession session = ReconstructionService.getActiveReconstructionForPlayer(player);
+
+            source.sendSuccess(() -> Component.literal("==== Реконструкция ===="), false);
+            source.sendSuccess(() -> Component.literal("ID: " + session.getId()), false);
+            source.sendSuccess(() -> Component.literal("Settlement ID: " + session.getSettlementId()), false);
+            source.sendSuccess(() -> Component.literal("Siege ID: " + session.getSiegeId()), false);
+            source.sendSuccess(() -> Component.literal("Snapshot ID: " + session.getSnapshotId()), false);
+            source.sendSuccess(() -> Component.literal("Активна: " + session.isActive()), false);
+            source.sendSuccess(() -> Component.literal("Всего позиций: " + session.getEntries().size()), false);
+            source.sendSuccess(() -> Component.literal("Ожидает восстановления: " + session.countPendingEntries()), false);
+            source.sendSuccess(() -> Component.literal("Восстановлено: " + session.countRestoredEntries()), false);
+            source.sendSuccess(() -> Component.literal("Пропущено: " + session.countSkippedEntries()), false);
+            source.sendSuccess(() -> Component.literal("Склад ресурсов: " + ReconstructionService.buildShortResourceSummary(session)), false);
+
+            return 1;
+        } catch (IllegalStateException ex) {
+            source.sendFailure(Component.literal(ex.getMessage()));
+            return 0;
+        }
+    }
+
+    private static int reconstructionDepositHand(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+
+        final ServerPlayer player;
+        try {
+            player = source.getPlayerOrException();
+        } catch (CommandSyntaxException e) {
+            source.sendFailure(Component.literal("Эту команду может использовать только игрок."));
+            return 0;
+        }
+
+        try {
+            int deposited = ReconstructionService.depositMainHand(player);
+            source.sendSuccess(
+                    () -> Component.literal("В склад реконструкции внесено предметов из руки: " + deposited),
+                    true
+            );
+            return 1;
+        } catch (IllegalStateException | IllegalArgumentException ex) {
+            source.sendFailure(Component.literal(ex.getMessage()));
+            return 0;
+        }
+    }
+
+    private static int reconstructionRestore(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+
+        final ServerPlayer player;
+        try {
+            player = source.getPlayerOrException();
+        } catch (CommandSyntaxException e) {
+            source.sendFailure(Component.literal("Эту команду может использовать только игрок."));
+            return 0;
+        }
+
+        try {
+            int restored = ReconstructionService.restoreAvailable(player);
+            source.sendSuccess(
+                    () -> Component.literal("Восстановлено позиций: " + restored),
+                    true
+            );
+            return 1;
+        } catch (IllegalStateException | IllegalArgumentException ex) {
+            source.sendFailure(Component.literal(ex.getMessage()));
+            return 0;
+        }
+    }
+
+    private static int reconstructionSkipLooked(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+
+        final ServerPlayer player;
+        try {
+            player = source.getPlayerOrException();
+        } catch (CommandSyntaxException e) {
+            source.sendFailure(Component.literal("Эту команду может использовать только игрок."));
+            return 0;
+        }
+
+        try {
+            ReconstructionService.skipLookedAtBlock(player);
+            source.sendSuccess(
+                    () -> Component.literal("Блок, на который ты смотришь, пропущен в реконструкции."),
+                    true
+            );
+            return 1;
+        } catch (IllegalStateException | IllegalArgumentException ex) {
+            source.sendFailure(Component.literal(ex.getMessage()));
+            return 0;
+        }
+    }
     private static LiteralArgumentBuilder<CommandSourceStack> buildTreasuryNode() {
         return Commands.literal("treasury")
                 .then(Commands.literal("balance")
