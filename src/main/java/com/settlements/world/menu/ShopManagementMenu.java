@@ -4,6 +4,7 @@ import com.settlements.data.SettlementSavedData;
 import com.settlements.data.model.PriceMode;
 import com.settlements.data.model.ShopRecord;
 import com.settlements.data.model.ShopTradeEntry;
+import com.settlements.network.ShopManagementPackets;
 import com.settlements.registry.ModBlocks;
 import com.settlements.registry.ModMenuTypes;
 import com.settlements.service.ShopService;
@@ -153,6 +154,7 @@ public class ShopManagementMenu extends AbstractContainerMenu {
         this.menuData = menuData;
         this.selectedTradeIndex = 1;
         this.selectedTradeDisplay = new SimpleContainer(1);
+
 
         this.addDataSlots(menuData);
 
@@ -359,6 +361,10 @@ public class ShopManagementMenu extends AbstractContainerMenu {
         return shopName;
     }
 
+    public BlockPos getShopPos() {
+        return shopPos;
+    }
+
     public long getBalance() {
         long low = Integer.toUnsignedLong(menuData.get(DATA_BALANCE_LOW));
         long high = Integer.toUnsignedLong(menuData.get(DATA_BALANCE_HIGH));
@@ -538,153 +544,6 @@ public class ShopManagementMenu extends AbstractContainerMenu {
         }
 
         return new ItemStack(item);
-    }
-
-    private ShopTradeEntry getSelectedTrade(ServerPlayer serverPlayer) {
-        ShopRecord shop = SettlementSavedData.get(serverPlayer.server).getShopByPos(serverPlayer.level(), shopPos);
-        if (shop == null) {
-            throw new IllegalStateException("Магазин не найден.");
-        }
-
-        ShopTradeEntry trade = shop.getTradeByHumanIndex(selectedTradeIndex);
-        if (trade == null) {
-            throw new IllegalStateException("Сделка не найдена.");
-        }
-
-        return trade;
-    }
-
-    private void adjustDynamicTrade(ServerPlayer serverPlayer, int buttonId) {
-        ShopTradeEntry trade = getSelectedTrade(serverPlayer);
-
-        if (!isAdminShop()) {
-            throw new IllegalStateException("Динамический режим доступен только у админ-магазина.");
-        }
-        if (trade.getPriceMode() != PriceMode.DYNAMIC) {
-            throw new IllegalStateException("Сначала включи динамический режим сделки.");
-        }
-
-        long baseSellPrice = trade.canSellToPlayer() ? Math.max(1L, trade.getSellPrice()) : 0L;
-        long baseBuyPrice = trade.canBuyFromPlayer() ? Math.max(1L, trade.getBuyPrice()) : 0L;
-
-        long minSellPrice = trade.canSellToPlayer() ? Math.max(1L, trade.getMinSellPrice()) : 1L;
-        long maxSellPrice = trade.canSellToPlayer() ? Math.max(1L, trade.getMaxSellPrice()) : 1L;
-        long minBuyPrice = trade.canBuyFromPlayer() ? Math.max(1L, trade.getMinBuyPrice()) : 1L;
-        long maxBuyPrice = trade.canBuyFromPlayer() ? Math.max(1L, trade.getMaxBuyPrice()) : 1L;
-
-        double elasticity = trade.getElasticity();
-        double decayPerStep = trade.getDecayPerStep();
-        double inactivitySellDrop = trade.getInactivitySellDrop();
-        double inactivityBuyRise = trade.getInactivityBuyRise();
-
-        if (buttonId == BUTTON_DYNAMIC_MIN_SELL_MINUS_1) {
-            minSellPrice--;
-        } else if (buttonId == BUTTON_DYNAMIC_MIN_SELL_PLUS_1) {
-            minSellPrice++;
-        } else if (buttonId == BUTTON_DYNAMIC_MAX_SELL_MINUS_1) {
-            maxSellPrice--;
-        } else if (buttonId == BUTTON_DYNAMIC_MAX_SELL_PLUS_1) {
-            maxSellPrice++;
-        } else if (buttonId == BUTTON_DYNAMIC_MIN_BUY_MINUS_1) {
-            minBuyPrice--;
-        } else if (buttonId == BUTTON_DYNAMIC_MIN_BUY_PLUS_1) {
-            minBuyPrice++;
-        } else if (buttonId == BUTTON_DYNAMIC_MAX_BUY_MINUS_1) {
-            maxBuyPrice--;
-        } else if (buttonId == BUTTON_DYNAMIC_MAX_BUY_PLUS_1) {
-            maxBuyPrice++;
-        } else if (buttonId == BUTTON_DYNAMIC_ELASTICITY_MINUS) {
-            elasticity -= 0.01D;
-        } else if (buttonId == BUTTON_DYNAMIC_ELASTICITY_PLUS) {
-            elasticity += 0.01D;
-        } else if (buttonId == BUTTON_DYNAMIC_DECAY_MINUS) {
-            decayPerStep -= 0.01D;
-        } else if (buttonId == BUTTON_DYNAMIC_DECAY_PLUS) {
-            decayPerStep += 0.01D;
-        } else if (buttonId == BUTTON_DYNAMIC_INACTIVITY_SELL_MINUS) {
-            inactivitySellDrop -= 0.01D;
-        } else if (buttonId == BUTTON_DYNAMIC_INACTIVITY_SELL_PLUS) {
-            inactivitySellDrop += 0.01D;
-        } else if (buttonId == BUTTON_DYNAMIC_INACTIVITY_BUY_MINUS) {
-            inactivityBuyRise -= 0.01D;
-        } else if (buttonId == BUTTON_DYNAMIC_INACTIVITY_BUY_PLUS) {
-            inactivityBuyRise += 0.01D;
-        } else {
-            return;
-        }
-
-        if (trade.canSellToPlayer()) {
-            if (minSellPrice < 1L) {
-                minSellPrice = 1L;
-            }
-            if (maxSellPrice < 1L) {
-                maxSellPrice = 1L;
-            }
-            if (minSellPrice > baseSellPrice) {
-                minSellPrice = baseSellPrice;
-            }
-            if (maxSellPrice < baseSellPrice) {
-                maxSellPrice = baseSellPrice;
-            }
-            if (minSellPrice > maxSellPrice) {
-                minSellPrice = maxSellPrice;
-            }
-        } else {
-            minSellPrice = 1L;
-            maxSellPrice = 1L;
-        }
-
-        if (trade.canBuyFromPlayer()) {
-            if (minBuyPrice < 1L) {
-                minBuyPrice = 1L;
-            }
-            if (maxBuyPrice < 1L) {
-                maxBuyPrice = 1L;
-            }
-            if (minBuyPrice > baseBuyPrice) {
-                minBuyPrice = baseBuyPrice;
-            }
-            if (maxBuyPrice < baseBuyPrice) {
-                maxBuyPrice = baseBuyPrice;
-            }
-            if (minBuyPrice > maxBuyPrice) {
-                minBuyPrice = maxBuyPrice;
-            }
-        } else {
-            minBuyPrice = 1L;
-            maxBuyPrice = 1L;
-        }
-
-        elasticity = clamp(elasticity, 0.0D, 10.0D);
-        decayPerStep = clamp(decayPerStep, 0.0D, 1.0D);
-        inactivitySellDrop = clamp(inactivitySellDrop, 0.0D, 10.0D);
-        inactivityBuyRise = clamp(inactivityBuyRise, 0.0D, 10.0D);
-
-        ShopService.configureDynamicTradeAt(
-                serverPlayer,
-                shopPos,
-                selectedTradeIndex,
-                baseSellPrice,
-                baseBuyPrice,
-                minSellPrice,
-                maxSellPrice,
-                minBuyPrice,
-                maxBuyPrice,
-                elasticity,
-                decayPerStep,
-                inactivitySellDrop,
-                inactivityBuyRise
-        );
-    }
-
-    private double clamp(double value, double min, double max) {
-        if (value < min) {
-            return min;
-        }
-        if (value > max) {
-            return max;
-        }
-        return value;
     }
 
     @Override
@@ -893,6 +752,141 @@ public class ShopManagementMenu extends AbstractContainerMenu {
         }
 
         return false;
+    }
+
+    private void adjustDynamicTrade(ServerPlayer serverPlayer, int buttonId) {
+        ShopRecord shop = ShopService.getShopAt(serverPlayer, shopPos);
+        ShopTradeEntry trade = shop.getTradeByHumanIndex(selectedTradeIndex);
+
+        if (trade == null) {
+            throw new IllegalStateException("Сделка не найдена.");
+        }
+        if (!shop.isAdminShop()) {
+            throw new IllegalStateException("Динамический режим доступен только у админ-магазина.");
+        }
+        if (trade.getPriceMode() != PriceMode.DYNAMIC) {
+            throw new IllegalStateException("Сначала включи динамический режим сделки.");
+        }
+
+        long baseSellPrice = trade.canSellToPlayer() ? Math.max(1L, trade.getSellPrice()) : 0L;
+        long baseBuyPrice = trade.canBuyFromPlayer() ? Math.max(1L, trade.getBuyPrice()) : 0L;
+
+        long minSellPrice = trade.canSellToPlayer() ? Math.max(1L, trade.getMinSellPrice()) : 1L;
+        long maxSellPrice = trade.canSellToPlayer() ? Math.max(1L, trade.getMaxSellPrice()) : 1L;
+        long minBuyPrice = trade.canBuyFromPlayer() ? Math.max(1L, trade.getMinBuyPrice()) : 1L;
+        long maxBuyPrice = trade.canBuyFromPlayer() ? Math.max(1L, trade.getMaxBuyPrice()) : 1L;
+
+        double elasticity = trade.getElasticity();
+        double decayPerStep = trade.getDecayPerStep();
+        double inactivitySellDrop = trade.getInactivitySellDrop();
+        double inactivityBuyRise = trade.getInactivityBuyRise();
+
+        if (buttonId == BUTTON_DYNAMIC_MIN_SELL_MINUS_1) {
+            minSellPrice--;
+        } else if (buttonId == BUTTON_DYNAMIC_MIN_SELL_PLUS_1) {
+            minSellPrice++;
+        } else if (buttonId == BUTTON_DYNAMIC_MAX_SELL_MINUS_1) {
+            maxSellPrice--;
+        } else if (buttonId == BUTTON_DYNAMIC_MAX_SELL_PLUS_1) {
+            maxSellPrice++;
+        } else if (buttonId == BUTTON_DYNAMIC_MIN_BUY_MINUS_1) {
+            minBuyPrice--;
+        } else if (buttonId == BUTTON_DYNAMIC_MIN_BUY_PLUS_1) {
+            minBuyPrice++;
+        } else if (buttonId == BUTTON_DYNAMIC_MAX_BUY_MINUS_1) {
+            maxBuyPrice--;
+        } else if (buttonId == BUTTON_DYNAMIC_MAX_BUY_PLUS_1) {
+            maxBuyPrice++;
+        } else if (buttonId == BUTTON_DYNAMIC_ELASTICITY_MINUS) {
+            elasticity -= 0.01D;
+        } else if (buttonId == BUTTON_DYNAMIC_ELASTICITY_PLUS) {
+            elasticity += 0.01D;
+        } else if (buttonId == BUTTON_DYNAMIC_DECAY_MINUS) {
+            decayPerStep -= 0.01D;
+        } else if (buttonId == BUTTON_DYNAMIC_DECAY_PLUS) {
+            decayPerStep += 0.01D;
+        } else if (buttonId == BUTTON_DYNAMIC_INACTIVITY_SELL_MINUS) {
+            inactivitySellDrop -= 0.01D;
+        } else if (buttonId == BUTTON_DYNAMIC_INACTIVITY_SELL_PLUS) {
+            inactivitySellDrop += 0.01D;
+        } else if (buttonId == BUTTON_DYNAMIC_INACTIVITY_BUY_MINUS) {
+            inactivityBuyRise -= 0.01D;
+        } else if (buttonId == BUTTON_DYNAMIC_INACTIVITY_BUY_PLUS) {
+            inactivityBuyRise += 0.01D;
+        }
+
+        if (trade.canSellToPlayer()) {
+            if (minSellPrice < 1L) {
+                minSellPrice = 1L;
+            }
+            if (maxSellPrice < 1L) {
+                maxSellPrice = 1L;
+            }
+            if (minSellPrice > baseSellPrice) {
+                minSellPrice = baseSellPrice;
+            }
+            if (maxSellPrice < baseSellPrice) {
+                maxSellPrice = baseSellPrice;
+            }
+            if (minSellPrice > maxSellPrice) {
+                minSellPrice = maxSellPrice;
+            }
+        } else {
+            minSellPrice = 1L;
+            maxSellPrice = 1L;
+        }
+
+        if (trade.canBuyFromPlayer()) {
+            if (minBuyPrice < 1L) {
+                minBuyPrice = 1L;
+            }
+            if (maxBuyPrice < 1L) {
+                maxBuyPrice = 1L;
+            }
+            if (minBuyPrice > baseBuyPrice) {
+                minBuyPrice = baseBuyPrice;
+            }
+            if (maxBuyPrice < baseBuyPrice) {
+                maxBuyPrice = baseBuyPrice;
+            }
+            if (minBuyPrice > maxBuyPrice) {
+                minBuyPrice = maxBuyPrice;
+            }
+        } else {
+            minBuyPrice = 1L;
+            maxBuyPrice = 1L;
+        }
+
+        elasticity = clamp(elasticity, 0.0D, 10.0D);
+        decayPerStep = clamp(decayPerStep, 0.0D, 1.0D);
+        inactivitySellDrop = clamp(inactivitySellDrop, 0.0D, 10.0D);
+        inactivityBuyRise = clamp(inactivityBuyRise, 0.0D, 10.0D);
+
+        ShopService.configureDynamicTradeAt(
+                serverPlayer,
+                shopPos,
+                selectedTradeIndex,
+                baseSellPrice,
+                baseBuyPrice,
+                minSellPrice,
+                maxSellPrice,
+                minBuyPrice,
+                maxBuyPrice,
+                elasticity,
+                decayPerStep,
+                inactivitySellDrop,
+                inactivityBuyRise
+        );
+    }
+
+    private double clamp(double value, double min, double max) {
+        if (value < min) {
+            return min;
+        }
+        if (value > max) {
+            return max;
+        }
+        return value;
     }
 
     @Override

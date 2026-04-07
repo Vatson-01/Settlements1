@@ -5,6 +5,7 @@ import com.settlements.registry.ModBlocks;
 import com.settlements.registry.ModItems;
 import com.settlements.registry.ModMenuTypes;
 import net.minecraftforge.eventbus.api.IEventBus;
+import com.settlements.network.ShopManagementPackets;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 
@@ -19,5 +20,6 @@ public class SettlementsMod {
         ModItems.register(modEventBus);
         ModBlockEntities.register(modEventBus);
         ModMenuTypes.register(modEventBus);
+        ShopManagementPackets.init();
     }
 }

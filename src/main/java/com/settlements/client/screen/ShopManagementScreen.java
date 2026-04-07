@@ -1,19 +1,27 @@
 package com.settlements.client.screen;
 
+import com.settlements.network.ShopManagementPackets;
+import com.settlements.network.packet.C2SShopManagementEditFieldPacket;
 import com.settlements.world.menu.ShopManagementMenu;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.Arrays;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 public class ShopManagementScreen extends AbstractContainerScreen<ShopManagementMenu> {
     private static final int TAB_MAIN = 0;
     private static final int TAB_DYNAMIC = 1;
+
+    private static final Pattern INTEGER_PATTERN = Pattern.compile("\\d*");
+    private static final Pattern DECIMAL_PATTERN = Pattern.compile("\\d*([\\.,]\\d*)?");
 
     private Button tabMainButton;
     private Button tabDynamicButton;
@@ -43,35 +51,19 @@ public class ShopManagementScreen extends AbstractContainerScreen<ShopManagement
     private Button toggleTradeEnabledButton;
     private Button toggleTradeModeButton;
 
-    private Button sellPriceMinus1Button;
-    private Button sellPricePlus1Button;
-    private Button sellPriceMinus10Button;
-    private Button sellPricePlus10Button;
-    private Button buyPriceMinus1Button;
-    private Button buyPricePlus1Button;
-    private Button buyPriceMinus10Button;
-    private Button buyPricePlus10Button;
-    private Button sellBatchMinusButton;
-    private Button sellBatchPlusButton;
-    private Button buyBatchMinusButton;
-    private Button buyBatchPlusButton;
+    private EditBox sellPriceBox;
+    private EditBox buyPriceBox;
+    private EditBox sellBatchBox;
+    private EditBox buyBatchBox;
 
-    private Button dynamicMinSellMinusButton;
-    private Button dynamicMinSellPlusButton;
-    private Button dynamicMaxSellMinusButton;
-    private Button dynamicMaxSellPlusButton;
-    private Button dynamicMinBuyMinusButton;
-    private Button dynamicMinBuyPlusButton;
-    private Button dynamicMaxBuyMinusButton;
-    private Button dynamicMaxBuyPlusButton;
-    private Button dynamicElasticityMinusButton;
-    private Button dynamicElasticityPlusButton;
-    private Button dynamicDecayMinusButton;
-    private Button dynamicDecayPlusButton;
-    private Button dynamicInactivitySellMinusButton;
-    private Button dynamicInactivitySellPlusButton;
-    private Button dynamicInactivityBuyMinusButton;
-    private Button dynamicInactivityBuyPlusButton;
+    private EditBox dynamicMinSellBox;
+    private EditBox dynamicMaxSellBox;
+    private EditBox dynamicMinBuyBox;
+    private EditBox dynamicMaxBuyBox;
+    private EditBox dynamicElasticityBox;
+    private EditBox dynamicDecayBox;
+    private EditBox dynamicInactivitySellBox;
+    private EditBox dynamicInactivityBuyBox;
 
     private int activeTab = TAB_MAIN;
 
@@ -89,11 +81,19 @@ public class ShopManagementScreen extends AbstractContainerScreen<ShopManagement
         int left = this.leftPos;
         int top = this.topPos;
 
-        tabMainButton = addRenderableWidget(Button.builder(Component.literal("Основное"), b -> activeTab = TAB_MAIN)
+        tabMainButton = addRenderableWidget(Button.builder(Component.literal("Основное"), b -> {
+                    commitFocusedBoxes();
+                    activeTab = TAB_MAIN;
+                    updateButtons();
+                })
                 .bounds(left + 184, top + 84, 96, 20)
                 .build());
 
-        tabDynamicButton = addRenderableWidget(Button.builder(Component.literal("Динамика"), b -> activeTab = TAB_DYNAMIC)
+        tabDynamicButton = addRenderableWidget(Button.builder(Component.literal("Динамика"), b -> {
+                    commitFocusedBoxes();
+                    activeTab = TAB_DYNAMIC;
+                    updateButtons();
+                })
                 .bounds(left + 284, top + 84, 96, 20)
                 .build());
 
@@ -137,11 +137,17 @@ public class ShopManagementScreen extends AbstractContainerScreen<ShopManagement
                 .bounds(left + 94, top + 148, 78, 20)
                 .build());
 
-        prevTradeButton = addRenderableWidget(Button.builder(Component.literal("<"), b -> press(ShopManagementMenu.BUTTON_PREV_TRADE))
+        prevTradeButton = addRenderableWidget(Button.builder(Component.literal("<"), b -> {
+                    commitFocusedBoxes();
+                    press(ShopManagementMenu.BUTTON_PREV_TRADE);
+                })
                 .bounds(left + 184, top + 12, 20, 20)
                 .build());
 
-        nextTradeButton = addRenderableWidget(Button.builder(Component.literal(">"), b -> press(ShopManagementMenu.BUTTON_NEXT_TRADE))
+        nextTradeButton = addRenderableWidget(Button.builder(Component.literal(">"), b -> {
+                    commitFocusedBoxes();
+                    press(ShopManagementMenu.BUTTON_NEXT_TRADE);
+                })
                 .bounds(left + 208, top + 12, 20, 20)
                 .build());
 
@@ -157,135 +163,83 @@ public class ShopManagementScreen extends AbstractContainerScreen<ShopManagement
                 .bounds(left + 388, top + 60, 96, 20)
                 .build());
 
-        toggleTradeModeButton = addRenderableWidget(Button.builder(Component.literal("Режим"), b -> press(ShopManagementMenu.BUTTON_TOGGLE_TRADE_MODE))
+        toggleTradeModeButton = addRenderableWidget(Button.builder(Component.literal("Режим"), b -> {
+                    commitFocusedBoxes();
+                    press(ShopManagementMenu.BUTTON_TOGGLE_TRADE_MODE);
+                })
                 .bounds(left + 388, top + 84, 96, 20)
                 .build());
 
-        addSellTradeButton = addRenderableWidget(Button.builder(Component.literal("Продать"), b -> press(ShopManagementMenu.BUTTON_ADD_SELL_TRADE))
+        addSellTradeButton = addRenderableWidget(Button.builder(Component.literal("Продать"), b -> {
+                    commitFocusedBoxes();
+                    press(ShopManagementMenu.BUTTON_ADD_SELL_TRADE);
+                })
                 .bounds(left + 184, top + 112, 92, 20)
                 .build());
 
-        addBuyTradeButton = addRenderableWidget(Button.builder(Component.literal("Скупать"), b -> press(ShopManagementMenu.BUTTON_ADD_BUY_TRADE))
+        addBuyTradeButton = addRenderableWidget(Button.builder(Component.literal("Скупать"), b -> {
+                    commitFocusedBoxes();
+                    press(ShopManagementMenu.BUTTON_ADD_BUY_TRADE);
+                })
                 .bounds(left + 280, top + 112, 92, 20)
                 .build());
 
-        addDualTradeButton = addRenderableWidget(Button.builder(Component.literal("Обе"), b -> press(ShopManagementMenu.BUTTON_ADD_DUAL_TRADE))
+        addDualTradeButton = addRenderableWidget(Button.builder(Component.literal("Обе"), b -> {
+                    commitFocusedBoxes();
+                    press(ShopManagementMenu.BUTTON_ADD_DUAL_TRADE);
+                })
                 .bounds(left + 376, top + 112, 108, 20)
                 .build());
 
-        removeTradeButton = addRenderableWidget(Button.builder(Component.literal("Удалить"), b -> press(ShopManagementMenu.BUTTON_REMOVE_TRADE))
+        removeTradeButton = addRenderableWidget(Button.builder(Component.literal("Удалить"), b -> {
+                    commitFocusedBoxes();
+                    press(ShopManagementMenu.BUTTON_REMOVE_TRADE);
+                })
                 .bounds(left + 184, top + 136, 146, 20)
                 .build());
 
-        toggleTradeEnabledButton = addRenderableWidget(Button.builder(Component.literal("Сделка"), b -> press(ShopManagementMenu.BUTTON_TOGGLE_TRADE_ENABLED))
+        toggleTradeEnabledButton = addRenderableWidget(Button.builder(Component.literal("Сделка"), b -> {
+                    commitFocusedBoxes();
+                    press(ShopManagementMenu.BUTTON_TOGGLE_TRADE_ENABLED);
+                })
                 .bounds(left + 334, top + 136, 150, 20)
                 .build());
 
-        sellPriceMinus1Button = addRenderableWidget(Button.builder(Component.literal("-1"), b -> press(ShopManagementMenu.BUTTON_SELL_PRICE_MINUS_1))
-                .bounds(left + 376, top + 184, 24, 20)
-                .build());
+        sellPriceBox = createIntegerBox(left + 390, top + 184, 94, 20, 18);
+        buyPriceBox = createIntegerBox(left + 390, top + 206, 94, 20, 18);
+        sellBatchBox = createIntegerBox(left + 390, top + 228, 94, 20, 9);
+        buyBatchBox = createIntegerBox(left + 390, top + 250, 94, 20, 9);
 
-        sellPricePlus1Button = addRenderableWidget(Button.builder(Component.literal("+1"), b -> press(ShopManagementMenu.BUTTON_SELL_PRICE_PLUS_1))
-                .bounds(left + 402, top + 184, 24, 20)
-                .build());
+        dynamicMinSellBox = createIntegerBox(left + 276, top + 142, 56, 18, 18);
+        dynamicMaxSellBox = createIntegerBox(left + 276, top + 164, 56, 18, 18);
+        dynamicMinBuyBox = createIntegerBox(left + 276, top + 186, 56, 18, 18);
+        dynamicMaxBuyBox = createIntegerBox(left + 276, top + 208, 56, 18, 18);
 
-        sellPriceMinus10Button = addRenderableWidget(Button.builder(Component.literal("-10"), b -> press(ShopManagementMenu.BUTTON_SELL_PRICE_MINUS_10))
-                .bounds(left + 428, top + 184, 28, 20)
-                .build());
+        dynamicElasticityBox = createDecimalBox(left + 430, top + 142, 54, 18, 10);
+        dynamicDecayBox = createDecimalBox(left + 430, top + 164, 54, 18, 10);
+        dynamicInactivitySellBox = createDecimalBox(left + 430, top + 186, 54, 18, 10);
+        dynamicInactivityBuyBox = createDecimalBox(left + 430, top + 208, 54, 18, 10);
 
-        sellPricePlus10Button = addRenderableWidget(Button.builder(Component.literal("+10"), b -> press(ShopManagementMenu.BUTTON_SELL_PRICE_PLUS_10))
-                .bounds(left + 458, top + 184, 26, 20)
-                .build());
-
-        buyPriceMinus1Button = addRenderableWidget(Button.builder(Component.literal("-1"), b -> press(ShopManagementMenu.BUTTON_BUY_PRICE_MINUS_1))
-                .bounds(left + 376, top + 206, 24, 20)
-                .build());
-
-        buyPricePlus1Button = addRenderableWidget(Button.builder(Component.literal("+1"), b -> press(ShopManagementMenu.BUTTON_BUY_PRICE_PLUS_1))
-                .bounds(left + 402, top + 206, 24, 20)
-                .build());
-
-        buyPriceMinus10Button = addRenderableWidget(Button.builder(Component.literal("-10"), b -> press(ShopManagementMenu.BUTTON_BUY_PRICE_MINUS_10))
-                .bounds(left + 428, top + 206, 28, 20)
-                .build());
-
-        buyPricePlus10Button = addRenderableWidget(Button.builder(Component.literal("+10"), b -> press(ShopManagementMenu.BUTTON_BUY_PRICE_PLUS_10))
-                .bounds(left + 458, top + 206, 26, 20)
-                .build());
-
-        sellBatchMinusButton = addRenderableWidget(Button.builder(Component.literal("-"), b -> press(ShopManagementMenu.BUTTON_SELL_BATCH_MINUS_1))
-                .bounds(left + 430, top + 228, 24, 20)
-                .build());
-
-        sellBatchPlusButton = addRenderableWidget(Button.builder(Component.literal("+"), b -> press(ShopManagementMenu.BUTTON_SELL_BATCH_PLUS_1))
-                .bounds(left + 458, top + 228, 26, 20)
-                .build());
-
-        buyBatchMinusButton = addRenderableWidget(Button.builder(Component.literal("-"), b -> press(ShopManagementMenu.BUTTON_BUY_BATCH_MINUS_1))
-                .bounds(left + 430, top + 250, 24, 20)
-                .build());
-
-        buyBatchPlusButton = addRenderableWidget(Button.builder(Component.literal("+"), b -> press(ShopManagementMenu.BUTTON_BUY_BATCH_PLUS_1))
-                .bounds(left + 458, top + 250, 26, 20)
-                .build());
-
-        dynamicMinSellMinusButton = addRenderableWidget(Button.builder(Component.literal("-"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_MIN_SELL_MINUS_1))
-                .bounds(left + 292, top + 130, 18, 18)
-                .build());
-        dynamicMinSellPlusButton = addRenderableWidget(Button.builder(Component.literal("+"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_MIN_SELL_PLUS_1))
-                .bounds(left + 314, top + 130, 18, 18)
-                .build());
-
-        dynamicMaxSellMinusButton = addRenderableWidget(Button.builder(Component.literal("-"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_MAX_SELL_MINUS_1))
-                .bounds(left + 292, top + 152, 18, 18)
-                .build());
-        dynamicMaxSellPlusButton = addRenderableWidget(Button.builder(Component.literal("+"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_MAX_SELL_PLUS_1))
-                .bounds(left + 314, top + 152, 18, 18)
-                .build());
-
-        dynamicMinBuyMinusButton = addRenderableWidget(Button.builder(Component.literal("-"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_MIN_BUY_MINUS_1))
-                .bounds(left + 292, top + 174, 18, 18)
-                .build());
-        dynamicMinBuyPlusButton = addRenderableWidget(Button.builder(Component.literal("+"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_MIN_BUY_PLUS_1))
-                .bounds(left + 314, top + 174, 18, 18)
-                .build());
-
-        dynamicMaxBuyMinusButton = addRenderableWidget(Button.builder(Component.literal("-"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_MAX_BUY_MINUS_1))
-                .bounds(left + 292, top + 196, 18, 18)
-                .build());
-        dynamicMaxBuyPlusButton = addRenderableWidget(Button.builder(Component.literal("+"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_MAX_BUY_PLUS_1))
-                .bounds(left + 314, top + 196, 18, 18)
-                .build());
-
-        dynamicElasticityMinusButton = addRenderableWidget(Button.builder(Component.literal("-"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_ELASTICITY_MINUS))
-                .bounds(left + 466, top + 130, 18, 18)
-                .build());
-        dynamicElasticityPlusButton = addRenderableWidget(Button.builder(Component.literal("+"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_ELASTICITY_PLUS))
-                .bounds(left + 444, top + 130, 18, 18)
-                .build());
-
-        dynamicDecayMinusButton = addRenderableWidget(Button.builder(Component.literal("-"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_DECAY_MINUS))
-                .bounds(left + 466, top + 152, 18, 18)
-                .build());
-        dynamicDecayPlusButton = addRenderableWidget(Button.builder(Component.literal("+"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_DECAY_PLUS))
-                .bounds(left + 444, top + 152, 18, 18)
-                .build());
-
-        dynamicInactivitySellMinusButton = addRenderableWidget(Button.builder(Component.literal("-"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_INACTIVITY_SELL_MINUS))
-                .bounds(left + 466, top + 174, 18, 18)
-                .build());
-        dynamicInactivitySellPlusButton = addRenderableWidget(Button.builder(Component.literal("+"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_INACTIVITY_SELL_PLUS))
-                .bounds(left + 444, top + 174, 18, 18)
-                .build());
-
-        dynamicInactivityBuyMinusButton = addRenderableWidget(Button.builder(Component.literal("-"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_INACTIVITY_BUY_MINUS))
-                .bounds(left + 466, top + 196, 18, 18)
-                .build());
-        dynamicInactivityBuyPlusButton = addRenderableWidget(Button.builder(Component.literal("+"), b -> press(ShopManagementMenu.BUTTON_DYNAMIC_INACTIVITY_BUY_PLUS))
-                .bounds(left + 444, top + 196, 18, 18)
-                .build());
-
+        syncBoxesFromMenu(true);
         updateButtons();
+    }
+
+    private EditBox createIntegerBox(int x, int y, int width, int height, int maxLength) {
+        EditBox box = new EditBox(this.font, x, y, width, height, Component.empty());
+        box.setMaxLength(maxLength);
+        box.setFilter(text -> INTEGER_PATTERN.matcher(text).matches());
+        box.setBordered(true);
+        addRenderableWidget(box);
+        return box;
+    }
+
+    private EditBox createDecimalBox(int x, int y, int width, int height, int maxLength) {
+        EditBox box = new EditBox(this.font, x, y, width, height, Component.empty());
+        box.setMaxLength(maxLength);
+        box.setFilter(text -> DECIMAL_PATTERN.matcher(text).matches());
+        box.setBordered(true);
+        addRenderableWidget(box);
+        return box;
     }
 
     private void press(int buttonId) {
@@ -297,7 +251,54 @@ public class ShopManagementScreen extends AbstractContainerScreen<ShopManagement
     @Override
     protected void containerTick() {
         super.containerTick();
+        syncBoxesFromMenu(false);
         updateButtons();
+    }
+
+    private void syncBoxesFromMenu(boolean force) {
+        if (force || !sellPriceBox.isFocused()) {
+            syncBox(sellPriceBox, menu.selectedTradeCanSell() ? String.valueOf(menu.getSelectedTradeSellPrice()) : "");
+        }
+        if (force || !buyPriceBox.isFocused()) {
+            syncBox(buyPriceBox, menu.selectedTradeCanBuy() ? String.valueOf(menu.getSelectedTradeBuyPrice()) : "");
+        }
+        if (force || !sellBatchBox.isFocused()) {
+            syncBox(sellBatchBox, menu.selectedTradeCanSell() ? String.valueOf(menu.getSelectedTradeSellBatch()) : "");
+        }
+        if (force || !buyBatchBox.isFocused()) {
+            syncBox(buyBatchBox, menu.selectedTradeCanBuy() ? String.valueOf(menu.getSelectedTradeBuyBatch()) : "");
+        }
+
+        if (force || !dynamicMinSellBox.isFocused()) {
+            syncBox(dynamicMinSellBox, menu.selectedTradeCanSell() ? String.valueOf(menu.getSelectedTradeMinSellPrice()) : "");
+        }
+        if (force || !dynamicMaxSellBox.isFocused()) {
+            syncBox(dynamicMaxSellBox, menu.selectedTradeCanSell() ? String.valueOf(menu.getSelectedTradeMaxSellPrice()) : "");
+        }
+        if (force || !dynamicMinBuyBox.isFocused()) {
+            syncBox(dynamicMinBuyBox, menu.selectedTradeCanBuy() ? String.valueOf(menu.getSelectedTradeMinBuyPrice()) : "");
+        }
+        if (force || !dynamicMaxBuyBox.isFocused()) {
+            syncBox(dynamicMaxBuyBox, menu.selectedTradeCanBuy() ? String.valueOf(menu.getSelectedTradeMaxBuyPrice()) : "");
+        }
+        if (force || !dynamicElasticityBox.isFocused()) {
+            syncBox(dynamicElasticityBox, formatDouble(menu.getSelectedTradeElasticity()));
+        }
+        if (force || !dynamicDecayBox.isFocused()) {
+            syncBox(dynamicDecayBox, formatDouble(menu.getSelectedTradeDecayPerStep()));
+        }
+        if (force || !dynamicInactivitySellBox.isFocused()) {
+            syncBox(dynamicInactivitySellBox, formatDouble(menu.getSelectedTradeInactivitySellDrop()));
+        }
+        if (force || !dynamicInactivityBuyBox.isFocused()) {
+            syncBox(dynamicInactivityBuyBox, formatDouble(menu.getSelectedTradeInactivityBuyRise()));
+        }
+    }
+
+    private void syncBox(EditBox box, String value) {
+        if (!value.equals(box.getValue())) {
+            box.setValue(value);
+        }
     }
 
     private void updateButtons() {
@@ -351,46 +352,139 @@ public class ShopManagementScreen extends AbstractContainerScreen<ShopManagement
         setVisibleAndActive(removeTradeButton, showMainTab, showMainTab && hasTrade);
         setVisibleAndActive(toggleTradeEnabledButton, showMainTab, showMainTab && hasTrade);
 
-        setVisibleAndActive(sellPriceMinus1Button, showMainTab && canSell, showMainTab && canSell);
-        setVisibleAndActive(sellPricePlus1Button, showMainTab && canSell, showMainTab && canSell);
-        setVisibleAndActive(sellPriceMinus10Button, showMainTab && canSell, showMainTab && canSell);
-        setVisibleAndActive(sellPricePlus10Button, showMainTab && canSell, showMainTab && canSell);
-
-        setVisibleAndActive(buyPriceMinus1Button, showMainTab && canBuy, showMainTab && canBuy);
-        setVisibleAndActive(buyPricePlus1Button, showMainTab && canBuy, showMainTab && canBuy);
-        setVisibleAndActive(buyPriceMinus10Button, showMainTab && canBuy, showMainTab && canBuy);
-        setVisibleAndActive(buyPricePlus10Button, showMainTab && canBuy, showMainTab && canBuy);
-
-        setVisibleAndActive(sellBatchMinusButton, showMainTab && canSell, showMainTab && canSell);
-        setVisibleAndActive(sellBatchPlusButton, showMainTab && canSell, showMainTab && canSell);
-        setVisibleAndActive(buyBatchMinusButton, showMainTab && canBuy, showMainTab && canBuy);
-        setVisibleAndActive(buyBatchPlusButton, showMainTab && canBuy, showMainTab && canBuy);
+        setBoxState(sellPriceBox, showMainTab && canSell, showMainTab && canSell);
+        setBoxState(buyPriceBox, showMainTab && canBuy, showMainTab && canBuy);
+        setBoxState(sellBatchBox, showMainTab && canSell, showMainTab && canSell);
+        setBoxState(buyBatchBox, showMainTab && canBuy, showMainTab && canBuy);
 
         boolean dynamicEditable = showDynamicTab && admin && hasTrade && dynamic;
 
-        setVisibleAndActive(dynamicMinSellMinusButton, showDynamicTab && canSell, dynamicEditable && canSell);
-        setVisibleAndActive(dynamicMinSellPlusButton, showDynamicTab && canSell, dynamicEditable && canSell);
-        setVisibleAndActive(dynamicMaxSellMinusButton, showDynamicTab && canSell, dynamicEditable && canSell);
-        setVisibleAndActive(dynamicMaxSellPlusButton, showDynamicTab && canSell, dynamicEditable && canSell);
+        setBoxState(dynamicMinSellBox, showDynamicTab && canSell, dynamicEditable && canSell);
+        setBoxState(dynamicMaxSellBox, showDynamicTab && canSell, dynamicEditable && canSell);
+        setBoxState(dynamicMinBuyBox, showDynamicTab && canBuy, dynamicEditable && canBuy);
+        setBoxState(dynamicMaxBuyBox, showDynamicTab && canBuy, dynamicEditable && canBuy);
 
-        setVisibleAndActive(dynamicMinBuyMinusButton, showDynamicTab && canBuy, dynamicEditable && canBuy);
-        setVisibleAndActive(dynamicMinBuyPlusButton, showDynamicTab && canBuy, dynamicEditable && canBuy);
-        setVisibleAndActive(dynamicMaxBuyMinusButton, showDynamicTab && canBuy, dynamicEditable && canBuy);
-        setVisibleAndActive(dynamicMaxBuyPlusButton, showDynamicTab && canBuy, dynamicEditable && canBuy);
-
-        setVisibleAndActive(dynamicElasticityMinusButton, showDynamicTab, dynamicEditable);
-        setVisibleAndActive(dynamicElasticityPlusButton, showDynamicTab, dynamicEditable);
-        setVisibleAndActive(dynamicDecayMinusButton, showDynamicTab, dynamicEditable);
-        setVisibleAndActive(dynamicDecayPlusButton, showDynamicTab, dynamicEditable);
-        setVisibleAndActive(dynamicInactivitySellMinusButton, showDynamicTab, dynamicEditable);
-        setVisibleAndActive(dynamicInactivitySellPlusButton, showDynamicTab, dynamicEditable);
-        setVisibleAndActive(dynamicInactivityBuyMinusButton, showDynamicTab, dynamicEditable);
-        setVisibleAndActive(dynamicInactivityBuyPlusButton, showDynamicTab, dynamicEditable);
+        setBoxState(dynamicElasticityBox, showDynamicTab, dynamicEditable);
+        setBoxState(dynamicDecayBox, showDynamicTab, dynamicEditable);
+        setBoxState(dynamicInactivitySellBox, showDynamicTab, dynamicEditable);
+        setBoxState(dynamicInactivityBuyBox, showDynamicTab, dynamicEditable);
     }
 
     private void setVisibleAndActive(Button button, boolean visible, boolean active) {
         button.visible = visible;
         button.active = visible && active;
+    }
+
+    private void setBoxState(EditBox box, boolean visible, boolean editable) {
+        box.visible = visible;
+        box.active = visible && editable;
+        box.setEditable(visible && editable);
+        if (!visible) {
+            box.setFocused(false);
+        }
+    }
+
+    private void commitFocusedBoxes() {
+        commitBoxIfFocused(sellPriceBox, C2SShopManagementEditFieldPacket.FIELD_SELL_PRICE);
+        commitBoxIfFocused(buyPriceBox, C2SShopManagementEditFieldPacket.FIELD_BUY_PRICE);
+        commitBoxIfFocused(sellBatchBox, C2SShopManagementEditFieldPacket.FIELD_SELL_BATCH);
+        commitBoxIfFocused(buyBatchBox, C2SShopManagementEditFieldPacket.FIELD_BUY_BATCH);
+
+        commitBoxIfFocused(dynamicMinSellBox, C2SShopManagementEditFieldPacket.FIELD_DYNAMIC_MIN_SELL);
+        commitBoxIfFocused(dynamicMaxSellBox, C2SShopManagementEditFieldPacket.FIELD_DYNAMIC_MAX_SELL);
+        commitBoxIfFocused(dynamicMinBuyBox, C2SShopManagementEditFieldPacket.FIELD_DYNAMIC_MIN_BUY);
+        commitBoxIfFocused(dynamicMaxBuyBox, C2SShopManagementEditFieldPacket.FIELD_DYNAMIC_MAX_BUY);
+        commitBoxIfFocused(dynamicElasticityBox, C2SShopManagementEditFieldPacket.FIELD_DYNAMIC_ELASTICITY);
+        commitBoxIfFocused(dynamicDecayBox, C2SShopManagementEditFieldPacket.FIELD_DYNAMIC_DECAY);
+        commitBoxIfFocused(dynamicInactivitySellBox, C2SShopManagementEditFieldPacket.FIELD_DYNAMIC_INACTIVITY_SELL);
+        commitBoxIfFocused(dynamicInactivityBuyBox, C2SShopManagementEditFieldPacket.FIELD_DYNAMIC_INACTIVITY_BUY);
+    }
+
+    private void commitVisibleBoxes() {
+        commitBoxIfFocused(sellPriceBox, C2SShopManagementEditFieldPacket.FIELD_SELL_PRICE);
+        commitBoxIfFocused(buyPriceBox, C2SShopManagementEditFieldPacket.FIELD_BUY_PRICE);
+        commitBoxIfFocused(sellBatchBox, C2SShopManagementEditFieldPacket.FIELD_SELL_BATCH);
+        commitBoxIfFocused(buyBatchBox, C2SShopManagementEditFieldPacket.FIELD_BUY_BATCH);
+
+        commitBoxIfFocused(dynamicMinSellBox, C2SShopManagementEditFieldPacket.FIELD_DYNAMIC_MIN_SELL);
+        commitBoxIfFocused(dynamicMaxSellBox, C2SShopManagementEditFieldPacket.FIELD_DYNAMIC_MAX_SELL);
+        commitBoxIfFocused(dynamicMinBuyBox, C2SShopManagementEditFieldPacket.FIELD_DYNAMIC_MIN_BUY);
+        commitBoxIfFocused(dynamicMaxBuyBox, C2SShopManagementEditFieldPacket.FIELD_DYNAMIC_MAX_BUY);
+        commitBoxIfFocused(dynamicElasticityBox, C2SShopManagementEditFieldPacket.FIELD_DYNAMIC_ELASTICITY);
+        commitBoxIfFocused(dynamicDecayBox, C2SShopManagementEditFieldPacket.FIELD_DYNAMIC_DECAY);
+        commitBoxIfFocused(dynamicInactivitySellBox, C2SShopManagementEditFieldPacket.FIELD_DYNAMIC_INACTIVITY_SELL);
+        commitBoxIfFocused(dynamicInactivityBuyBox, C2SShopManagementEditFieldPacket.FIELD_DYNAMIC_INACTIVITY_BUY);
+    }
+
+    private void commitBoxIfFocused(EditBox box, String field) {
+        if (!box.isFocused() || !box.visible || !box.active) {
+            return;
+        }
+
+        String value = box.getValue().trim();
+        if (value.isEmpty()) {
+            syncBoxesFromMenu(true);
+            return;
+        }
+
+        try {
+            validateField(field, value);
+            ShopManagementPackets.sendEditField(field, value);
+        } catch (Exception e) {
+            if (this.minecraft != null && this.minecraft.player != null) {
+                this.minecraft.player.displayClientMessage(Component.literal(e.getMessage()), true);
+            }
+            syncBoxesFromMenu(true);
+        }
+    }
+
+    private void validateField(String field, String value) {
+        if (C2SShopManagementEditFieldPacket.FIELD_SELL_PRICE.equals(field)
+                || C2SShopManagementEditFieldPacket.FIELD_BUY_PRICE.equals(field)
+                || C2SShopManagementEditFieldPacket.FIELD_DYNAMIC_MIN_SELL.equals(field)
+                || C2SShopManagementEditFieldPacket.FIELD_DYNAMIC_MAX_SELL.equals(field)
+                || C2SShopManagementEditFieldPacket.FIELD_DYNAMIC_MIN_BUY.equals(field)
+                || C2SShopManagementEditFieldPacket.FIELD_DYNAMIC_MAX_BUY.equals(field)) {
+            long parsed = Long.parseLong(value);
+            if (parsed <= 0L) {
+                throw new IllegalArgumentException("Нужно число больше нуля.");
+            }
+            return;
+        }
+
+        if (C2SShopManagementEditFieldPacket.FIELD_SELL_BATCH.equals(field)
+                || C2SShopManagementEditFieldPacket.FIELD_BUY_BATCH.equals(field)) {
+            int parsed = Integer.parseInt(value);
+            if (parsed <= 0) {
+                throw new IllegalArgumentException("Нужно число больше нуля.");
+            }
+            return;
+        }
+
+        double parsed = Double.parseDouble(value.replace(',', '.'));
+        if (parsed < 0.0D) {
+            throw new IllegalArgumentException("Нужно число не меньше нуля.");
+        }
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        commitFocusedBoxes();
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER || keyCode == GLFW.GLFW_KEY_TAB) {
+            commitFocusedBoxes();
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    @Override
+    public void removed() {
+        commitVisibleBoxes();
+        super.removed();
     }
 
     @Override
@@ -451,14 +545,15 @@ public class ShopManagementScreen extends AbstractContainerScreen<ShopManagement
             drawDynamicTabLabels(graphics);
         }
 
+        graphics.drawString(this.font, "Enter = применить", 184, 270, 0xB8B8B8, false);
         graphics.drawString(this.font, this.playerInventoryTitle, 8, this.inventoryLabelY, 0xFFFFFF, false);
     }
 
     private void drawMainTabLabels(GuiGraphics graphics) {
-        graphics.drawString(this.font, "Продажа: " + tradeValueText(this.menu.selectedTradeCanSell(), this.menu.getSelectedTradeSellPrice()), 184, 188, 0xFFFFFF, false);
-        graphics.drawString(this.font, "Скупка: " + tradeValueText(this.menu.selectedTradeCanBuy(), this.menu.getSelectedTradeBuyPrice()), 184, 210, 0xFFFFFF, false);
-        graphics.drawString(this.font, "Пачка прод.: " + batchText(this.menu.selectedTradeCanSell(), this.menu.getSelectedTradeSellBatch()), 184, 232, 0xFFFFFF, false);
-        graphics.drawString(this.font, "Пачка скуп.: " + batchText(this.menu.selectedTradeCanBuy(), this.menu.getSelectedTradeBuyBatch()), 184, 254, 0xFFFFFF, false);
+        graphics.drawString(this.font, "Продажа:", 184, 190, 0xFFFFFF, false);
+        graphics.drawString(this.font, "Скупка:", 184, 212, 0xFFFFFF, false);
+        graphics.drawString(this.font, "Пачка прод.:", 184, 234, 0xFFFFFF, false);
+        graphics.drawString(this.font, "Пачка скуп.:", 184, 256, 0xFFFFFF, false);
     }
 
     private void drawDynamicTabLabels(GuiGraphics graphics) {
@@ -482,19 +577,15 @@ public class ShopManagementScreen extends AbstractContainerScreen<ShopManagement
             return;
         }
 
-        graphics.drawString(this.font, dynamicRow("Мин. продажа", this.menu.selectedTradeCanSell(), String.valueOf(this.menu.getSelectedTradeMinSellPrice())), 184, 146, 0xFFFFFF, false);
-        graphics.drawString(this.font, dynamicRow("Макс. продажа", this.menu.selectedTradeCanSell(), String.valueOf(this.menu.getSelectedTradeMaxSellPrice())), 184, 168, 0xFFFFFF, false);
-        graphics.drawString(this.font, dynamicRow("Мин. скупка", this.menu.selectedTradeCanBuy(), String.valueOf(this.menu.getSelectedTradeMinBuyPrice())), 184, 190, 0xFFFFFF, false);
-        graphics.drawString(this.font, dynamicRow("Макс. скупка", this.menu.selectedTradeCanBuy(), String.valueOf(this.menu.getSelectedTradeMaxBuyPrice())), 184, 212, 0xFFFFFF, false);
+        graphics.drawString(this.font, "Мин. продажа:", 184, 146, 0xFFFFFF, false);
+        graphics.drawString(this.font, "Макс. продажа:", 184, 168, 0xFFFFFF, false);
+        graphics.drawString(this.font, "Мин. скупка:", 184, 190, 0xFFFFFF, false);
+        graphics.drawString(this.font, "Макс. скупка:", 184, 212, 0xFFFFFF, false);
 
-        graphics.drawString(this.font, "Эластичность: " + formatDouble(this.menu.getSelectedTradeElasticity()), 340, 146, 0xFFFFFF, false);
-        graphics.drawString(this.font, "Затухание: " + formatDouble(this.menu.getSelectedTradeDecayPerStep()), 340, 168, 0xFFFFFF, false);
-        graphics.drawString(this.font, "Пад. продажи: " + formatDouble(this.menu.getSelectedTradeInactivitySellDrop()), 340, 190, 0xFFFFFF, false);
-        graphics.drawString(this.font, "Рост скупки: " + formatDouble(this.menu.getSelectedTradeInactivityBuyRise()), 340, 212, 0xFFFFFF, false);
-    }
-
-    private String dynamicRow(String label, boolean supported, String value) {
-        return label + ": " + (supported ? value : "—");
+        graphics.drawString(this.font, "Эластичность:", 340, 146, 0xFFFFFF, false);
+        graphics.drawString(this.font, "Затухание:", 340, 168, 0xFFFFFF, false);
+        graphics.drawString(this.font, "Пад. продажи:", 340, 190, 0xFFFFFF, false);
+        graphics.drawString(this.font, "Рост скупки:", 340, 212, 0xFFFFFF, false);
     }
 
     private String formatDouble(double value) {
@@ -532,10 +623,6 @@ public class ShopManagementScreen extends AbstractContainerScreen<ShopManagement
     }
 
     private String tradeValueText(boolean supported, long value) {
-        return supported ? String.valueOf(value) : "—";
-    }
-
-    private String batchText(boolean supported, int value) {
         return supported ? String.valueOf(value) : "—";
     }
 
