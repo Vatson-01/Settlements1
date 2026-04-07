@@ -1,7 +1,9 @@
 package com.settlements.service;
 
 import com.settlements.data.SettlementSavedData;
+import com.settlements.data.model.ReconstructionSession;
 import com.settlements.data.model.Settlement;
+import com.settlements.data.model.SiegeSnapshot;
 import com.settlements.data.model.SiegeState;
 import com.settlements.data.model.WarRecord;
 import net.minecraft.server.MinecraftServer;
@@ -112,14 +114,12 @@ public final class WarService {
         );
 
         data.addOrUpdateSiege(siege);
-
-        // TODO:
-        // SiegeSnapshotService.captureDefenderSnapshot(server, siege.getId(), defenderSettlementId);
+        SiegeSnapshotService.captureDefenderSnapshot(server, siege.getId(), defenderSettlementId);
 
         return siege;
     }
 
-    public static void endSiege(
+    public static ReconstructionSession endSiege(
             MinecraftServer server,
             UUID attackerSettlementId,
             UUID defenderSettlementId,
@@ -136,8 +136,7 @@ public final class WarService {
         siege.close(gameTime, adminId, reason);
         data.addOrUpdateSiege(siege);
 
-        // TODO:
-        // SiegeSnapshotService.finalizeSiegeAndCreateReconstruction(server, siege.getId());
+        return SiegeSnapshotService.finalizeSiegeAndCreateReconstruction(server, siege.getId());
     }
 
     public static boolean isWarActive(MinecraftServer server, UUID settlementAId, UUID settlementBId) {

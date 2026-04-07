@@ -18,6 +18,7 @@ import com.settlements.data.model.SettlementPlot;
 import com.settlements.data.model.ShopRecord;
 import com.settlements.data.model.ShopTradeEntry;
 import com.settlements.data.model.SiegeState;
+import com.settlements.data.model.ReconstructionSession;
 import com.settlements.data.model.WarRecord;
 import com.settlements.service.ClaimService;
 import com.settlements.service.CurrencyService;
@@ -1230,7 +1231,7 @@ public final class SettlementDebugCommands {
         try {
             UUID adminId = source.getEntity() != null ? source.getEntity().getUUID() : null;
 
-            WarService.endSiege(
+            ReconstructionSession reconstruction = WarService.endSiege(
                     source.getServer(),
                     attacker.getId(),
                     defender.getId(),
@@ -1238,13 +1239,28 @@ public final class SettlementDebugCommands {
                     reason
             );
 
-            source.sendSuccess(
-                    () -> Component.literal(
-                            "Осада завершена: \"" + attacker.getName()
-                                    + "\" больше не осаждает \"" + defender.getName() + "\"."
-                    ),
-                    true
-            );
+            if (reconstruction == null) {
+                source.sendSuccess(
+                        () -> Component.literal(
+                                "Осада завершена: \"" + attacker.getName()
+                                        + "\" больше не осаждает \"" + defender.getName()
+                                        + "\". Разрушений для реконструкции не найдено."
+                        ),
+                        true
+                );
+            } else {
+                source.sendSuccess(
+                        () -> Component.literal(
+                                "Осада завершена: \"" + attacker.getName()
+                                        + "\" больше не осаждает \"" + defender.getName()
+                                        + "\". Создана реконструкция: позиций="
+                                        + reconstruction.getEntries().size()
+                                        + ", пропущено=" + reconstruction.countSkippedEntries()
+                                        + ", ожидает ресурсов=" + reconstruction.countPendingEntries()
+                        ),
+                        true
+                );
+            }
 
             return 1;
         } catch (IllegalArgumentException | IllegalStateException ex) {

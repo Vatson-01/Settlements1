@@ -1,9 +1,11 @@
 package com.settlements.data;
 
+import com.settlements.data.model.ReconstructionSession;
 import com.settlements.data.model.Settlement;
 import com.settlements.data.model.SettlementChunkClaim;
 import com.settlements.data.model.SettlementPlot;
 import com.settlements.data.model.ShopRecord;
+import com.settlements.data.model.SiegeSnapshot;
 import com.settlements.data.model.SiegeState;
 import com.settlements.data.model.WarPairKey;
 import com.settlements.data.model.WarRecord;
@@ -48,6 +50,12 @@ public class SettlementSavedData extends SavedData {
     private final Map<UUID, UUID> activeSiegeIdByWarId = new LinkedHashMap<UUID, UUID>();
     private final Map<UUID, UUID> activeSiegeIdByDefenderSettlementId = new LinkedHashMap<UUID, UUID>();
     private final Map<UUID, UUID> activeSiegeIdByAttackerSettlementId = new LinkedHashMap<UUID, UUID>();
+
+    private final Map<UUID, SiegeSnapshot> snapshotsById = new LinkedHashMap<UUID, SiegeSnapshot>();
+    private final Map<UUID, UUID> snapshotIdBySiegeId = new LinkedHashMap<UUID, UUID>();
+
+    private final Map<UUID, ReconstructionSession> reconstructionsById = new LinkedHashMap<UUID, ReconstructionSession>();
+    private final Map<UUID, UUID> activeReconstructionIdBySettlementId = new LinkedHashMap<UUID, UUID>();
 
     public SettlementSavedData() {
     }
@@ -121,6 +129,27 @@ public class SettlementSavedData extends SavedData {
             }
         }
 
+        if (tag.contains("Snapshots", Tag.TAG_LIST)) {
+            ListTag snapshotList = tag.getList("Snapshots", Tag.TAG_COMPOUND);
+            for (int i = 0; i < snapshotList.size(); i++) {
+                SiegeSnapshot snapshot = SiegeSnapshot.load(snapshotList.getCompound(i));
+                if (data.siegesById.containsKey(snapshot.getSiegeId())
+                        && data.settlementsById.containsKey(snapshot.getDefenderSettlementId())) {
+                    data.snapshotsById.put(snapshot.getId(), snapshot);
+                }
+            }
+        }
+
+        if (tag.contains("Reconstructions", Tag.TAG_LIST)) {
+            ListTag reconstructionList = tag.getList("Reconstructions", Tag.TAG_COMPOUND);
+            for (int i = 0; i < reconstructionList.size(); i++) {
+                ReconstructionSession session = ReconstructionSession.load(reconstructionList.getCompound(i));
+                if (data.settlementsById.containsKey(session.getSettlementId())) {
+                    data.reconstructionsById.put(session.getId(), session);
+                }
+            }
+        }
+
         data.rebuildIndexes();
         return data;
     }
@@ -163,6 +192,18 @@ public class SettlementSavedData extends SavedData {
         }
         tag.put("Sieges", siegesTag);
 
+        ListTag snapshotsTag = new ListTag();
+        for (SiegeSnapshot snapshot : snapshotsById.values()) {
+            snapshotsTag.add(snapshot.save());
+        }
+        tag.put("Snapshots", snapshotsTag);
+
+        ListTag reconstructionsTag = new ListTag();
+        for (ReconstructionSession session : reconstructionsById.values()) {
+            reconstructionsTag.add(session.save());
+        }
+        tag.put("Reconstructions", reconstructionsTag);
+
         ListTag shopsTag = new ListTag();
         for (ShopRecord shop : shopsById.values()) {
             shopsTag.add(shop.save());
@@ -200,6 +241,20 @@ public class SettlementSavedData extends SavedData {
 
     public SettlementChunkClaim getClaim(net.minecraft.resources.ResourceKey<Level> dimension, ChunkPos chunkPos) {
         return claimsByKey.get(ClaimKeyUtil.toKey(dimension, chunkPos));
+    }
+
+    public Collection<SettlementChunkClaim> getAllClaims() {
+        return Collections.unmodifiableCollection(claimsByKey.values());
+    }
+
+    public List<SettlementChunkClaim> getClaimsForSettlement(UUID settlementId) {
+        List<SettlementChunkClaim> result = new ArrayList<SettlementChunkClaim>();
+        for (SettlementChunkClaim claim : claimsByKey.values()) {
+            if (claim.getSettlementId().equals(settlementId)) {
+                result.add(claim);
+            }
+        }
+        return result;
     }
 
     public Settlement getSettlementByChunk(Level level, ChunkPos chunkPos) {
@@ -285,12 +340,12 @@ public class SettlementSavedData extends SavedData {
         }
 
         plotsById.entrySet().removeIf(entry -> entry.getValue().getSettlementId().equals(settlementId));
-        shopsById.entrySet().removeIf(entry ->
-                entry.getValue().getSettlementId() != null
-                        && entry.getValue().getSettlementId().equals(settlementId));
+        shopsById.entrySet().removeIf(entry -> entry.getValue().getSettlementId() != null && entry.getValue().getSettlementId().equals(settlementId));
 
         warsById.entrySet().removeIf(entry -> entry.getValue().involvesSettlement(settlementId));
         siegesById.entrySet().removeIf(entry -> entry.getValue().involvesSettlement(settlementId));
+        snapshotsById.entrySet().removeIf(entry -> entry.getValue().getDefenderSettlementId().equals(settlementId));
+        reconstructionsById.entrySet().removeIf(entry -> entry.getValue().getSettlementId().equals(settlementId));
 
         rebuildIndexes();
         setDirty();
@@ -398,7 +453,6 @@ public class SettlementSavedData extends SavedData {
         if (settlementAId == null || settlementBId == null || settlementAId.equals(settlementBId)) {
             return null;
         }
-
         UUID warId = activeWarIdByPair.get(WarPairKey.of(settlementAId, settlementBId));
         return warId == null ? null : warsById.get(warId);
     }
@@ -456,6 +510,53 @@ public class SettlementSavedData extends SavedData {
         setDirty();
     }
 
+    public Collection<SiegeSnapshot> getAllSnapshots() {
+        return Collections.unmodifiableCollection(snapshotsById.values());
+    }
+
+    public SiegeSnapshot getSnapshot(UUID snapshotId) {
+        return snapshotsById.get(snapshotId);
+    }
+
+    public SiegeSnapshot getSnapshotBySiegeId(UUID siegeId) {
+        UUID snapshotId = snapshotIdBySiegeId.get(siegeId);
+        return snapshotId == null ? null : snapshotsById.get(snapshotId);
+    }
+
+    public void addOrUpdateSnapshot(SiegeSnapshot snapshot) {
+        snapshotsById.put(snapshot.getId(), snapshot);
+        rebuildIndexes();
+        setDirty();
+    }
+
+    public Collection<ReconstructionSession> getAllReconstructions() {
+        return Collections.unmodifiableCollection(reconstructionsById.values());
+    }
+
+    public ReconstructionSession getReconstruction(UUID reconstructionId) {
+        return reconstructionsById.get(reconstructionId);
+    }
+
+    public ReconstructionSession getActiveReconstructionForSettlement(UUID settlementId) {
+        UUID reconstructionId = activeReconstructionIdBySettlementId.get(settlementId);
+        return reconstructionId == null ? null : reconstructionsById.get(reconstructionId);
+    }
+
+    public void addOrUpdateReconstruction(ReconstructionSession session) {
+        reconstructionsById.put(session.getId(), session);
+        rebuildIndexes();
+        setDirty();
+    }
+
+    public void clearActiveReconstructionForSettlement(UUID settlementId) {
+        ReconstructionSession existing = getActiveReconstructionForSettlement(settlementId);
+        if (existing != null) {
+            reconstructionsById.remove(existing.getId());
+            rebuildIndexes();
+            setDirty();
+        }
+    }
+
     private void rebuildIndexes() {
         settlementIdByNameLower.clear();
         settlementIdByPlayer.clear();
@@ -467,6 +568,9 @@ public class SettlementSavedData extends SavedData {
         activeSiegeIdByWarId.clear();
         activeSiegeIdByDefenderSettlementId.clear();
         activeSiegeIdByAttackerSettlementId.clear();
+
+        snapshotIdBySiegeId.clear();
+        activeReconstructionIdBySettlementId.clear();
 
         for (Settlement settlement : settlementsById.values()) {
             settlementIdByNameLower.put(settlement.getName().trim().toLowerCase(), settlement.getId());
@@ -499,6 +603,16 @@ public class SettlementSavedData extends SavedData {
                 activeSiegeIdByWarId.put(siege.getWarId(), siege.getId());
                 activeSiegeIdByDefenderSettlementId.put(siege.getDefenderSettlementId(), siege.getId());
                 activeSiegeIdByAttackerSettlementId.put(siege.getAttackerSettlementId(), siege.getId());
+            }
+        }
+
+        for (SiegeSnapshot snapshot : snapshotsById.values()) {
+            snapshotIdBySiegeId.put(snapshot.getSiegeId(), snapshot.getId());
+        }
+
+        for (ReconstructionSession session : reconstructionsById.values()) {
+            if (session.isActive()) {
+                activeReconstructionIdBySettlementId.put(session.getSettlementId(), session.getId());
             }
         }
     }
