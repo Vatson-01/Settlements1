@@ -858,7 +858,7 @@ public class ShopManagementMenu extends AbstractContainerMenu {
         }
 
         elasticity = clamp(elasticity, 0.0D, 10.0D);
-        decayPerStep = clamp(decayPerStep, 0.0D, 1.0D);
+        decayPerStep = clamp(decayPerStep, 0.0D, 10.0D);
         inactivitySellDrop = clamp(inactivitySellDrop, 0.0D, 10.0D);
         inactivityBuyRise = clamp(inactivityBuyRise, 0.0D, 10.0D);
 

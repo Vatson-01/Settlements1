@@ -207,18 +207,18 @@ public class ShopManagementScreen extends AbstractContainerScreen<ShopManagement
 
         sellPriceBox = createIntegerBox(left + 390, top + 184, 94, 20, 18);
         buyPriceBox = createIntegerBox(left + 390, top + 206, 94, 20, 18);
-        sellBatchBox = createIntegerBox(left + 390, top + 228, 94, 20, 9);
-        buyBatchBox = createIntegerBox(left + 390, top + 250, 94, 20, 9);
+        sellBatchBox = createIntegerBox(left + 390, top + 228, 94, 20, 12);
+        buyBatchBox = createIntegerBox(left + 390, top + 250, 94, 20, 12);
 
         dynamicMinSellBox = createIntegerBox(left + 276, top + 142, 56, 18, 18);
         dynamicMaxSellBox = createIntegerBox(left + 276, top + 164, 56, 18, 18);
         dynamicMinBuyBox = createIntegerBox(left + 276, top + 186, 56, 18, 18);
         dynamicMaxBuyBox = createIntegerBox(left + 276, top + 208, 56, 18, 18);
 
-        dynamicElasticityBox = createDecimalBox(left + 430, top + 142, 54, 18, 10);
-        dynamicDecayBox = createDecimalBox(left + 430, top + 164, 54, 18, 10);
-        dynamicInactivitySellBox = createDecimalBox(left + 430, top + 186, 54, 18, 10);
-        dynamicInactivityBuyBox = createDecimalBox(left + 430, top + 208, 54, 18, 10);
+        dynamicElasticityBox = createDecimalBox(left + 430, top + 142, 54, 18, 18);
+        dynamicDecayBox = createDecimalBox(left + 430, top + 164, 54, 18, 18);
+        dynamicInactivitySellBox = createDecimalBox(left + 430, top + 186, 54, 18, 18);
+        dynamicInactivityBuyBox = createDecimalBox(left + 430, top + 208, 54, 18, 18);
 
         syncBoxesFromMenu(true);
         updateButtons();
@@ -282,16 +282,16 @@ public class ShopManagementScreen extends AbstractContainerScreen<ShopManagement
             syncBox(dynamicMaxBuyBox, menu.selectedTradeCanBuy() ? String.valueOf(menu.getSelectedTradeMaxBuyPrice()) : "");
         }
         if (force || !dynamicElasticityBox.isFocused()) {
-            syncBox(dynamicElasticityBox, formatDouble(menu.getSelectedTradeElasticity()));
+            syncBox(dynamicElasticityBox, formatEditableDouble(menu.getSelectedTradeElasticity()));
         }
         if (force || !dynamicDecayBox.isFocused()) {
-            syncBox(dynamicDecayBox, formatDouble(menu.getSelectedTradeDecayPerStep()));
+            syncBox(dynamicDecayBox, formatEditableDouble(menu.getSelectedTradeDecayPerStep()));
         }
         if (force || !dynamicInactivitySellBox.isFocused()) {
-            syncBox(dynamicInactivitySellBox, formatDouble(menu.getSelectedTradeInactivitySellDrop()));
+            syncBox(dynamicInactivitySellBox, formatEditableDouble(menu.getSelectedTradeInactivitySellDrop()));
         }
         if (force || !dynamicInactivityBuyBox.isFocused()) {
-            syncBox(dynamicInactivityBuyBox, formatDouble(menu.getSelectedTradeInactivityBuyRise()));
+            syncBox(dynamicInactivityBuyBox, formatEditableDouble(menu.getSelectedTradeInactivityBuyRise()));
         }
     }
 
@@ -588,8 +588,12 @@ public class ShopManagementScreen extends AbstractContainerScreen<ShopManagement
         graphics.drawString(this.font, "Рост скупки:", 340, 212, 0xFFFFFF, false);
     }
 
-    private String formatDouble(double value) {
-        return String.format(Locale.ROOT, "%.2f", value);
+    private String formatEditableDouble(double value) {
+        String text = String.format(Locale.ROOT, "%.6f", value);
+        while (text.contains(".") && (text.endsWith("0") || text.endsWith("."))) {
+            text = text.substring(0, text.length() - 1);
+        }
+        return text.isEmpty() ? "0" : text;
     }
 
     private String tradeCounterText() {

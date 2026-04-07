@@ -229,10 +229,10 @@ public class C2SShopManagementEditFieldPacket {
             maxBuyPrice = 1L;
         }
 
-        elasticity = clamp(elasticity, 0.0D, 10.0D);
-        decayPerStep = clamp(decayPerStep, 0.0D, 1.0D);
-        inactivitySellDrop = clamp(inactivitySellDrop, 0.0D, 10.0D);
-        inactivityBuyRise = clamp(inactivityBuyRise, 0.0D, 10.0D);
+        elasticity = clampMin(elasticity, 0.0D);
+        decayPerStep = clampMin(decayPerStep, 0.0D);
+        inactivitySellDrop = clampMin(inactivitySellDrop, 0.0D);
+        inactivityBuyRise = clampMin(inactivityBuyRise, 0.0D);
 
         ShopService.configureDynamicTradeAt(
                 player,
@@ -287,13 +287,7 @@ public class C2SShopManagementEditFieldPacket {
         }
     }
 
-    private static double clamp(double value, double min, double max) {
-        if (value < min) {
-            return min;
-        }
-        if (value > max) {
-            return max;
-        }
-        return value;
+    private static double clampMin(double value, double min) {
+        return value < min ? min : value;
     }
 }
