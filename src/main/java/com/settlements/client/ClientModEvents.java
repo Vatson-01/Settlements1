@@ -1,6 +1,7 @@
 package com.settlements.client;
 
 import com.settlements.SettlementsMod;
+import com.settlements.client.screen.SettlementScreen;
 import com.settlements.client.screen.ShopManagementScreen;
 import com.settlements.client.screen.ShopScreen;
 import com.settlements.registry.ModMenuTypes;
@@ -20,6 +21,7 @@ public final class ClientModEvents {
         event.enqueueWork(() -> {
             MenuScreens.register(ModMenuTypes.SHOP_MENU.get(), ShopScreen::new);
             MenuScreens.register(ModMenuTypes.SHOP_MANAGEMENT_MENU.get(), ShopManagementScreen::new);
+            MenuScreens.register(ModMenuTypes.SETTLEMENT_MENU.get(), SettlementScreen::new);
         });
     }
 }

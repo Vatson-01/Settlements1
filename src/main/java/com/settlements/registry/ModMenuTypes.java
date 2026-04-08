@@ -1,6 +1,7 @@
 package com.settlements.registry;
 
 import com.settlements.SettlementsMod;
+import com.settlements.world.menu.SettlementMenu;
 import com.settlements.world.menu.ShopManagementMenu;
 import com.settlements.world.menu.ShopMenu;
 import net.minecraft.world.inventory.MenuType;
@@ -19,6 +20,9 @@ public final class ModMenuTypes {
 
     public static final RegistryObject<MenuType<ShopManagementMenu>> SHOP_MANAGEMENT_MENU =
             MENU_TYPES.register("shop_management_menu", () -> IForgeMenuType.create(ShopManagementMenu::new));
+
+    public static final RegistryObject<MenuType<SettlementMenu>> SETTLEMENT_MENU =
+            MENU_TYPES.register("settlement_menu", () -> IForgeMenuType.create(SettlementMenu::new));
 
     private ModMenuTypes() {
     }

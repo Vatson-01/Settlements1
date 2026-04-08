@@ -13,6 +13,7 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.settlements.data.SettlementSavedData;
 import com.settlements.data.model.PlotPermission;
 import com.settlements.data.model.ReconstructionSession;
+import com.settlements.service.SettlementMenuService;
 import com.settlements.service.ReconstructionService;
 import com.settlements.data.model.PlotPermissionSet;
 import com.settlements.data.model.Settlement;
@@ -83,6 +84,7 @@ public final class SettlementDebugCommands {
                         .then(buildWarNode())
                         .then(buildSiegeNode())
                         .then(buildReconstructionNode())
+                        .then(buildSettlementMenuNode())
         );
     }
 
@@ -98,6 +100,31 @@ public final class SettlementDebugCommands {
                     );
                     return 1;
                 });
+    }
+    private static LiteralArgumentBuilder<CommandSourceStack> buildSettlementMenuNode() {
+        return Commands.literal("menu")
+                .executes(SettlementDebugCommands::openSettlementMenu);
+    }
+
+    private static int openSettlementMenu(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+
+        final ServerPlayer player;
+        try {
+            player = source.getPlayerOrException();
+        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
+            source.sendFailure(Component.literal("Эту команду может использовать только игрок."));
+            return 0;
+        }
+
+        try {
+            SettlementMenuService.openMenu(player);
+            source.sendSuccess(() -> Component.literal("Меню поселения открыто."), true);
+            return 1;
+        } catch (IllegalStateException ex) {
+            source.sendFailure(Component.literal(ex.getMessage()));
+            return 0;
+        }
     }
     private static LiteralArgumentBuilder<CommandSourceStack> buildReconstructionNode() {
         return Commands.literal("reconstruction")
