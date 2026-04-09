@@ -7,7 +7,6 @@ import com.settlements.data.model.Settlement;
 import com.settlements.data.model.SettlementMember;
 import com.settlements.data.model.SettlementPermission;
 import com.settlements.data.model.SiegeState;
-import java.util.Comparator;
 import com.settlements.data.model.WarRecord;
 import com.settlements.registry.ModMenuTypes;
 import com.settlements.service.ReconstructionRestoreResult;
@@ -25,6 +24,7 @@ import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -242,6 +242,7 @@ public class SettlementMenu extends AbstractContainerMenu {
 
         return playerUuid.toString();
     }
+
     private static List<SettlementMember> getOrderedMembers(final ServerPlayer viewer, Settlement settlement) {
         List<SettlementMember> ordered = new ArrayList<SettlementMember>();
         if (settlement == null) {
@@ -303,6 +304,31 @@ public class SettlementMenu extends AbstractContainerMenu {
             private int reconstructionPage = 0;
             private int selectedResidentIndex = 0;
 
+            private final List<UUID> residentOrder = createResidentOrder();
+
+            private List<UUID> createResidentOrder() {
+                List<UUID> result = new ArrayList<UUID>();
+
+                if (!(playerInventory.player instanceof ServerPlayer)) {
+                    return result;
+                }
+
+                ServerPlayer serverPlayer = (ServerPlayer) playerInventory.player;
+                Settlement settlement = SettlementSavedData.get(serverPlayer.server).getSettlement(settlementId);
+                if (settlement == null) {
+                    return result;
+                }
+
+                List<SettlementMember> orderedMembers = SettlementMenu.getOrderedMembers(serverPlayer, settlement);
+                for (SettlementMember member : orderedMembers) {
+                    if (member != null && member.getPlayerUuid() != null) {
+                        result.add(member.getPlayerUuid());
+                    }
+                }
+
+                return result;
+            }
+
             private Settlement getSettlement() {
                 if (!(playerInventory.player instanceof ServerPlayer)) {
                     return null;
@@ -334,48 +360,21 @@ public class SettlementMenu extends AbstractContainerMenu {
                 ServerPlayer serverPlayer = (ServerPlayer) playerInventory.player;
                 return SettlementSavedData.get(serverPlayer.server).getActiveWarsForSettlement(settlementId);
             }
-            private List<SettlementMember> getOrderedMembers(Settlement settlement) {
-                if (settlement == null) {
-                    return Collections.emptyList();
-                }
 
-                List<SettlementMember> ordered = new ArrayList<SettlementMember>(settlement.getMembers());
-                if (playerInventory.player instanceof ServerPlayer) {
-                    final ServerPlayer serverPlayer = (ServerPlayer) playerInventory.player;
-                    Collections.sort(ordered, new Comparator<SettlementMember>() {
-                        @Override
-                        public int compare(SettlementMember first, SettlementMember second) {
-                            if (first == second) {
-                                return 0;
-                            }
-                            if (first == null) {
-                                return 1;
-                            }
-                            if (second == null) {
-                                return -1;
-                            }
-                            if (first.isLeader() != second.isLeader()) {
-                                return first.isLeader() ? -1 : 1;
-                            }
-
-                            String firstName = resolvePlayerName(serverPlayer, first.getPlayerUuid());
-                            String secondName = resolvePlayerName(serverPlayer, second.getPlayerUuid());
-                            int byName = firstName.compareToIgnoreCase(secondName);
-                            if (byName != 0) {
-                                return byName;
-                            }
-                            return first.getPlayerUuid().toString().compareTo(second.getPlayerUuid().toString());
-                        }
-                    });
-                }
-                return ordered;
-            }
             private SettlementMember getSelectedResident(Settlement settlement) {
-                List<SettlementMember> ordered = getOrderedMembers(settlement);
-                if (selectedResidentIndex < 0 || selectedResidentIndex >= ordered.size()) {
+                if (settlement == null) {
                     return null;
                 }
-                return ordered.get(selectedResidentIndex);
+                if (selectedResidentIndex < 0 || selectedResidentIndex >= residentOrder.size()) {
+                    return null;
+                }
+
+                UUID residentUuid = residentOrder.get(selectedResidentIndex);
+                if (residentUuid == null) {
+                    return null;
+                }
+
+                return settlement.getMember(residentUuid);
             }
 
             private boolean canEditSelectedResidentPermissions(Settlement settlement, SettlementMember self, SettlementMember target) {
@@ -587,6 +586,7 @@ public class SettlementMenu extends AbstractContainerMenu {
                 if (index == DATA_SELECTED_RESIDENT_IS_LEADER) {
                     return selectedResident != null && selectedResident.isLeader() ? 1 : 0;
                 }
+
                 long selectedPermissionMask = encodePermissionMask(selectedResident);
                 if (index == DATA_SELECTED_RESIDENT_PERMISSION_MASK_LOW) {
                     return (int) (selectedPermissionMask & 0xFFFFFFFFL);
@@ -594,6 +594,7 @@ public class SettlementMenu extends AbstractContainerMenu {
                 if (index == DATA_SELECTED_RESIDENT_PERMISSION_MASK_HIGH) {
                     return (int) ((selectedPermissionMask >>> 32) & 0xFFFFFFFFL);
                 }
+
                 long selectedPersonalTax = selectedResident == null ? 0L : selectedResident.getPersonalTaxAmount();
                 if (index == DATA_SELECTED_RESIDENT_PERSONAL_TAX_LOW) {
                     return (int) (selectedPersonalTax & 0xFFFFFFFFL);
@@ -601,6 +602,7 @@ public class SettlementMenu extends AbstractContainerMenu {
                 if (index == DATA_SELECTED_RESIDENT_PERSONAL_TAX_HIGH) {
                     return (int) ((selectedPersonalTax >>> 32) & 0xFFFFFFFFL);
                 }
+
                 long selectedDebt = selectedResident == null ? 0L : selectedResident.getPersonalTaxDebt();
                 if (index == DATA_SELECTED_RESIDENT_DEBT_LOW) {
                     return (int) (selectedDebt & 0xFFFFFFFFL);
@@ -608,6 +610,7 @@ public class SettlementMenu extends AbstractContainerMenu {
                 if (index == DATA_SELECTED_RESIDENT_DEBT_HIGH) {
                     return (int) ((selectedDebt >>> 32) & 0xFFFFFFFFL);
                 }
+
                 if (index == DATA_SELECTED_RESIDENT_SHOP_TAX) {
                     return selectedResident == null ? 0 : selectedResident.getShopTaxPercent();
                 }
@@ -661,7 +664,20 @@ public class SettlementMenu extends AbstractContainerMenu {
                     return;
                 }
                 if (index == DATA_SELECTED_RESIDENT_INDEX) {
-                    selectedResidentIndex = Math.max(0, value);
+                    if (residentOrder.isEmpty()) {
+                        selectedResidentIndex = 0;
+                        return;
+                    }
+
+                    int clamped = value;
+                    if (clamped < 0) {
+                        clamped = 0;
+                    }
+                    if (clamped >= residentOrder.size()) {
+                        clamped = residentOrder.size() - 1;
+                    }
+
+                    selectedResidentIndex = clamped;
                 }
             }
 
@@ -998,12 +1014,18 @@ public class SettlementMenu extends AbstractContainerMenu {
             SettlementSavedData data = SettlementSavedData.get(serverPlayer.server);
             Settlement settlement = data.getSettlement(settlementId);
             SettlementMember self = settlement == null ? null : settlement.getMember(serverPlayer.getUUID());
+
             SettlementMember selectedResident = null;
             if (settlement != null) {
-                List<SettlementMember> orderedResidents = getOrderedMembers(serverPlayer, settlement);
-                int selectedResidentIndex = menuData.get(DATA_SELECTED_RESIDENT_INDEX);
-                if (selectedResidentIndex >= 0 && selectedResidentIndex < orderedResidents.size()) {
-                    selectedResident = orderedResidents.get(selectedResidentIndex);
+                int selectedIndex = menuData.get(DATA_SELECTED_RESIDENT_INDEX);
+                if (selectedIndex >= 0 && selectedIndex < residentViews.size()) {
+                    SettlementResidentView selectedView = residentViews.get(selectedIndex);
+                    try {
+                        UUID selectedUuid = UUID.fromString(selectedView.getPlayerUuid());
+                        selectedResident = settlement.getMember(selectedUuid);
+                    } catch (IllegalArgumentException ignored) {
+                        selectedResident = null;
+                    }
                 }
             }
 
