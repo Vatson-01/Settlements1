@@ -141,15 +141,15 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
             addRenderableWidget(permissionButtons[i]);
         }
 
-        personalTaxMinus100Button = smallButton(left + 156, top + 114, "-100", button -> pressButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_MINUS_100));
-        personalTaxMinus10Button = smallButton(left + 205, top + 114, "-10", button -> pressButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_MINUS_10));
-        personalTaxPlus10Button = smallButton(left + 254, top + 114, "+10", button -> pressButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_PLUS_10));
-        personalTaxPlus100Button = smallButton(left + 303, top + 114, "+100", button -> pressButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_PLUS_100));
+        personalTaxMinus100Button = smallButton(left + 156, top + 122, "-100", button -> pressButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_MINUS_100));
+        personalTaxMinus10Button = smallButton(left + 205, top + 122, "-10", button -> pressButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_MINUS_10));
+        personalTaxPlus10Button = smallButton(left + 254, top + 122, "+10", button -> pressButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_PLUS_10));
+        personalTaxPlus100Button = smallButton(left + 303, top + 122, "+100", button -> pressButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_PLUS_100));
 
-        shopTaxMinus10Button = smallButton(left + 156, top + 140, "-10", button -> pressButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_MINUS_10));
-        shopTaxMinus1Button = smallButton(left + 205, top + 140, "-1", button -> pressButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_MINUS_1));
-        shopTaxPlus1Button = smallButton(left + 254, top + 140, "+1", button -> pressButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_PLUS_1));
-        shopTaxPlus10Button = smallButton(left + 303, top + 140, "+10", button -> pressButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_PLUS_10));
+        shopTaxMinus10Button = smallButton(left + 156, top + 146, "-10", button -> pressButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_MINUS_10));
+        shopTaxMinus1Button = smallButton(left + 205, top + 146, "-1", button -> pressButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_MINUS_1));
+        shopTaxPlus1Button = smallButton(left + 254, top + 146, "+1", button -> pressButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_PLUS_1));
+        shopTaxPlus10Button = smallButton(left + 303, top + 146, "+10", button -> pressButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_PLUS_10));
 
         addRenderableWidget(personalTaxMinus100Button);
         addRenderableWidget(personalTaxMinus10Button);
@@ -236,6 +236,7 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
 
             int index = residentPage * LIST_ROWS + row;
             if (index >= 0 && index < menu.getResidentViews().size()) {
+                menu.clientSelectResident(index);
                 pressButton(SettlementMenu.BUTTON_SELECT_RESIDENT_BASE + index);
             }
             return;
@@ -544,7 +545,7 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
     }
 
     private void renderResidents(GuiGraphics graphics) {
-        graphics.drawString(this.font, buildPageText(getCurrentPage(), getCurrentMaxPage()), 292, 58, 0xFFFFFF, false);
+        graphics.drawString(this.font, buildPageText(getCurrentPage(), getCurrentMaxPage()), 300, 58, 0xFFFFFF, false);
 
         if (!menu.canAccessResidentsTab()) {
             graphics.drawString(this.font, "Нет права просматривать жителей.", 140, 84, 0xFFB0B0, false);
@@ -557,7 +558,14 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
             return;
         }
 
-        graphics.drawString(this.font, "Выбран: " + shorten(selected.getDisplayName(), 18), 140, 78, selected.isLeader() ? 0xFFFF88 : 0xFFFFFF, false);
+        graphics.drawString(
+                this.font,
+                "Выбран: " + shorten(selected.getDisplayName(), 18),
+                140,
+                78,
+                selected.isLeader() ? 0xFFFF88 : 0xFFFFFF,
+                false
+        );
 
         if (residentPanelMode == ResidentPanelMode.TAXES) {
             graphics.drawString(this.font, "UUID: " + shorten(selected.getPlayerUuid(), 22), 140, 90, 0xC8C8C8, false);
@@ -566,8 +574,9 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
                     ? String.valueOf(menu.getSelectedResidentPersonalDebt())
                     : "скрыт";
             graphics.drawString(this.font, "Личный долг: " + debtText, 140, 102, 0xFFD8A8, false);
+
             graphics.drawString(this.font, "Личный налог: " + menu.getSelectedResidentPersonalTaxAmount(), 140, 114, 0xFFFFFF, false);
-            graphics.drawString(this.font, "Налог магазинов: " + menu.getSelectedResidentShopTaxPercent() + "%", 140, 140, 0xFFFFFF, false);
+            graphics.drawString(this.font, "Налог магазинов: " + menu.getSelectedResidentShopTaxPercent() + "%", 140, 138, 0xFFFFFF, false);
         } else {
             if (!menu.canViewResidentPermissionPage()) {
                 graphics.drawString(this.font, "Нет права смотреть права жителей.", 140, 84, 0xFFB0B0, false);
@@ -581,6 +590,7 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
                 if (index >= permissions.length) {
                     continue;
                 }
+
                 SettlementPermission permission = permissions[index];
                 int y = 84 + row * 14;
                 int color = menu.selectedResidentHasPermission(permission) ? 0xA8FFA8 : 0xFFB0B0;
@@ -588,7 +598,6 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
             }
         }
     }
-
     private void renderWar(GuiGraphics graphics) {
         graphics.drawString(this.font, "Активные войны", 12, 58, 0xFFFFFF, false);
         graphics.drawString(this.font, buildPageText(getCurrentPage(), getCurrentMaxPage()), 278, 58, 0xFFFFFF, false);

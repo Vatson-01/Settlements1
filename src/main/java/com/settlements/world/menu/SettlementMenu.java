@@ -917,6 +917,23 @@ public class SettlementMenu extends AbstractContainerMenu {
         return residentViews.get(index);
     }
 
+    public void clientSelectResident(int index) {
+        if (residentViews.isEmpty()) {
+            menuData.set(DATA_SELECTED_RESIDENT_INDEX, 0);
+            return;
+        }
+
+        int clamped = index;
+        if (clamped < 0) {
+            clamped = 0;
+        }
+        if (clamped >= residentViews.size()) {
+            clamped = residentViews.size() - 1;
+        }
+
+        menuData.set(DATA_SELECTED_RESIDENT_INDEX, clamped);
+    }
+
     public void clientSetReconstructionEntrySkipped(int oneBasedIndex, boolean skipped) {
         for (int i = 0; i < reconstructionViews.size(); i++) {
             SettlementReconstructionEntryView view = reconstructionViews.get(i);
