@@ -965,11 +965,33 @@ public class SettlementMenu extends AbstractContainerMenu {
     public void clientMarkReconstructionEntrySkipped(int oneBasedIndex) {
         clientSetReconstructionEntrySkipped(oneBasedIndex, true);
     }
+    private SettlementMember resolveSelectedResidentFromViews(Settlement settlement) {
+        if (settlement == null) {
+            return null;
+        }
 
+        int selectedIndex = menuData.get(DATA_SELECTED_RESIDENT_INDEX);
+        if (selectedIndex < 0 || selectedIndex >= residentViews.size()) {
+            return null;
+        }
+
+        SettlementResidentView selectedView = residentViews.get(selectedIndex);
+        if (selectedView == null) {
+            return null;
+        }
+
+        try {
+            UUID selectedUuid = UUID.fromString(selectedView.getPlayerUuid());
+            return settlement.getMember(selectedUuid);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
     @Override
     public boolean clickMenuButton(Player player, int buttonId) {
         if (buttonId == BUTTON_TAB_OVERVIEW) {
             menuData.set(DATA_SELECTED_TAB, SettlementMenuTab.OVERVIEW.getIndex());
+            broadcastChanges();
             return true;
         }
         if (buttonId == BUTTON_TAB_RESIDENTS) {
@@ -977,24 +999,29 @@ public class SettlementMenu extends AbstractContainerMenu {
                 return false;
             }
             menuData.set(DATA_SELECTED_TAB, SettlementMenuTab.RESIDENTS.getIndex());
+            broadcastChanges();
             return true;
         }
         if (buttonId == BUTTON_TAB_WAR) {
             menuData.set(DATA_SELECTED_TAB, SettlementMenuTab.WAR.getIndex());
+            broadcastChanges();
             return true;
         }
         if (buttonId == BUTTON_TAB_RECONSTRUCTION) {
             menuData.set(DATA_SELECTED_TAB, SettlementMenuTab.RECONSTRUCTION.getIndex());
+            broadcastChanges();
             return true;
         }
 
         if (buttonId == BUTTON_PAGE_PREV) {
             decrementPage();
+            broadcastChanges();
             return true;
         }
 
         if (buttonId == BUTTON_PAGE_NEXT) {
             incrementPage();
+            broadcastChanges();
             return true;
         }
 
@@ -1003,6 +1030,7 @@ public class SettlementMenu extends AbstractContainerMenu {
                 return false;
             }
             menuData.set(DATA_SELECTED_RESIDENT_INDEX, buttonId - BUTTON_SELECT_RESIDENT_BASE);
+            broadcastChanges();
             return true;
         }
 
@@ -1016,21 +1044,7 @@ public class SettlementMenu extends AbstractContainerMenu {
             SettlementSavedData data = SettlementSavedData.get(serverPlayer.server);
             Settlement settlement = data.getSettlement(settlementId);
             SettlementMember self = settlement == null ? null : settlement.getMember(serverPlayer.getUUID());
-            SettlementMember selectedResident = null;
-            if (settlement != null) {
-                int selectedIndex = menuData.get(DATA_SELECTED_RESIDENT_INDEX);
-                if (selectedIndex >= 0 && selectedIndex < residentViews.size()) {
-                    SettlementResidentView selectedView = residentViews.get(selectedIndex);
-                    if (selectedView != null) {
-                        try {
-                            UUID selectedUuid = UUID.fromString(selectedView.getPlayerUuid());
-                            selectedResident = settlement.getMember(selectedUuid);
-                        } catch (IllegalArgumentException ignored) {
-                            selectedResident = null;
-                        }
-                    }
-                }
-            }
+            SettlementMember selectedResident = resolveSelectedResidentFromViews(settlement);
 
             if (buttonId >= BUTTON_TOGGLE_SELECTED_PERMISSION_BASE
                     && buttonId < BUTTON_TOGGLE_SELECTED_PERMISSION_BASE + SettlementPermission.values().length) {
@@ -1044,6 +1058,7 @@ public class SettlementMenu extends AbstractContainerMenu {
                     selectedResident.getPermissionSet().grant(permission);
                 }
                 data.setDirty();
+                broadcastChanges();
                 return true;
             }
 
@@ -1060,6 +1075,7 @@ public class SettlementMenu extends AbstractContainerMenu {
                         : 100L;
                 selectedResident.setPersonalTaxAmount(selectedResident.getPersonalTaxAmount() + delta);
                 data.setDirty();
+                broadcastChanges();
                 return true;
             }
 
@@ -1076,27 +1092,32 @@ public class SettlementMenu extends AbstractContainerMenu {
                         : 10;
                 selectedResident.setShopTaxPercent(selectedResident.getShopTaxPercent() + delta);
                 data.setDirty();
+                broadcastChanges();
                 return true;
             }
 
             if (buttonId == BUTTON_STOP_RECONSTRUCTION) {
                 ReconstructionService.stopActive(serverPlayer);
+                broadcastChanges();
                 serverPlayer.displayClientMessage(Component.literal("Реконструкция принудительно остановлена."), true);
                 return true;
             }
 
             if (buttonId >= BUTTON_SKIP_RECON_ENTRY_BASE && buttonId < BUTTON_STOP_RECONSTRUCTION) {
                 ReconstructionService.skipEntryByIndex(serverPlayer, buttonId - BUTTON_SKIP_RECON_ENTRY_BASE);
+                broadcastChanges();
                 return true;
             }
 
             if (buttonId == BUTTON_OPEN_RECONSTRUCTION_STORAGE) {
                 ReconstructionService.openStorage(serverPlayer);
+                broadcastChanges();
                 return true;
             }
 
             if (buttonId == BUTTON_RESTORE_RECONSTRUCTION) {
                 ReconstructionRestoreResult result = ReconstructionService.restoreAvailable(serverPlayer);
+                broadcastChanges();
                 serverPlayer.displayClientMessage(
                         Component.literal(
                                 "Восстановлено: " + result.getRestored()
@@ -1117,7 +1138,6 @@ public class SettlementMenu extends AbstractContainerMenu {
 
         return false;
     }
-
     private static boolean canEditResidentPermissions(ServerPlayer actor, Settlement settlement, SettlementMember self, SettlementMember target) {
         if (settlement == null || self == null || target == null || target.isLeader()) {
             return false;

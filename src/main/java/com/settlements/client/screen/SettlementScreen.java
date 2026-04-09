@@ -386,6 +386,8 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         }
 
         boolean residentsTab = selectedTab == SettlementMenuTab.RESIDENTS && menu.canAccessResidentsTab();
+        boolean hasSelectedResident = residentsTab && menu.hasSelectedResident();
+        boolean selectedResidentIsLeader = hasSelectedResident && menu.isSelectedResidentLeader();
 
         residentTaxesModeButton.visible = residentsTab;
         residentPermissionsModeButton.visible = residentsTab && menu.canViewResidentPermissionPage();
@@ -405,7 +407,7 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
             permissionButtons[i].active = false;
         }
 
-        if (permissionMode && menu.hasSelectedResident()) {
+        if (permissionMode && hasSelectedResident) {
             SettlementPermission[] permissions = SettlementPermission.values();
             int start = permissionPage * PERMISSION_ROWS;
             for (int row = 0; row < PERMISSION_ROWS; row++) {
@@ -416,7 +418,7 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
                 SettlementPermission permission = permissions[index];
                 visiblePermissionOrdinals[row] = permission.ordinal();
                 permissionButtons[row].visible = true;
-                permissionButtons[row].active = menu.canEditSelectedResidentPermissions();
+                permissionButtons[row].active = menu.hasSelectedResident() && !menu.isSelectedResidentLeader();
                 permissionButtons[row].setMessage(Component.literal(menu.selectedResidentHasPermission(permission) ? "Вкл" : "Выкл"));
             }
         }
@@ -431,14 +433,16 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         shopTaxPlus1Button.visible = taxesMode;
         shopTaxPlus10Button.visible = taxesMode;
 
-        personalTaxMinus100Button.active = taxesMode && menu.canEditSelectedResidentPersonalTax();
-        personalTaxMinus10Button.active = taxesMode && menu.canEditSelectedResidentPersonalTax();
-        personalTaxPlus10Button.active = taxesMode && menu.canEditSelectedResidentPersonalTax();
-        personalTaxPlus100Button.active = taxesMode && menu.canEditSelectedResidentPersonalTax();
-        shopTaxMinus10Button.active = taxesMode && menu.canEditSelectedResidentShopTax();
-        shopTaxMinus1Button.active = taxesMode && menu.canEditSelectedResidentShopTax();
-        shopTaxPlus1Button.active = taxesMode && menu.canEditSelectedResidentShopTax();
-        shopTaxPlus10Button.active = taxesMode && menu.canEditSelectedResidentShopTax();
+        boolean allowTaxButtons = taxesMode && menu.hasSelectedResident() && !menu.isSelectedResidentLeader();
+
+        personalTaxMinus100Button.active = allowTaxButtons;
+        personalTaxMinus10Button.active = allowTaxButtons;
+        personalTaxPlus10Button.active = allowTaxButtons;
+        personalTaxPlus100Button.active = allowTaxButtons;
+        shopTaxMinus10Button.active = allowTaxButtons;
+        shopTaxMinus1Button.active = allowTaxButtons;
+        shopTaxPlus1Button.active = allowTaxButtons;
+        shopTaxPlus10Button.active = allowTaxButtons;
 
         boolean reconstructionTab = selectedTab == SettlementMenuTab.RECONSTRUCTION;
         reconstructionResourcesModeButton.visible = reconstructionTab;
@@ -449,11 +453,10 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         restoreButton.visible = reconstructionTab;
         stopReconstructionButton.visible = reconstructionTab;
 
-        openStorageButton.active = reconstructionTab && menu.hasActiveReconstruction() && menu.canOpenReconstructionStorage();
-        restoreButton.active = reconstructionTab && menu.hasActiveReconstruction() && menu.canRestoreReconstruction();
+        openStorageButton.active = reconstructionTab && menu.hasActiveReconstruction();
+        restoreButton.active = reconstructionTab && menu.hasActiveReconstruction();
         stopReconstructionButton.active = reconstructionTab && menu.hasActiveReconstruction() && menu.canStopReconstruction();
     }
-
     @Override
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
         int left = this.leftPos;
