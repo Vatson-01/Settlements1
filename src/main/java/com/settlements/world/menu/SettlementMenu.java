@@ -40,22 +40,22 @@ public class SettlementMenu extends AbstractContainerMenu {
     public static final int BUTTON_PAGE_NEXT = 11;
     public static final int BUTTON_OPEN_RECONSTRUCTION_STORAGE = 12;
     public static final int BUTTON_RESTORE_RECONSTRUCTION = 13;
+    public static final int BUTTON_STOP_RECONSTRUCTION = 14;
 
     public static final int BUTTON_SELECT_RESIDENT_BASE = 20;
     public static final int BUTTON_TOGGLE_SELECTED_PERMISSION_BASE = 100;
 
-    public static final int BUTTON_SELECTED_PERSONAL_TAX_MINUS_100 = 180;
-    public static final int BUTTON_SELECTED_PERSONAL_TAX_MINUS_10 = 181;
-    public static final int BUTTON_SELECTED_PERSONAL_TAX_PLUS_10 = 182;
-    public static final int BUTTON_SELECTED_PERSONAL_TAX_PLUS_100 = 183;
+    public static final int BUTTON_SELECTED_PERSONAL_TAX_MINUS_100 = 120;
+    public static final int BUTTON_SELECTED_PERSONAL_TAX_MINUS_10 = 121;
+    public static final int BUTTON_SELECTED_PERSONAL_TAX_PLUS_10 = 122;
+    public static final int BUTTON_SELECTED_PERSONAL_TAX_PLUS_100 = 123;
 
-    public static final int BUTTON_SELECTED_SHOP_TAX_MINUS_10 = 184;
-    public static final int BUTTON_SELECTED_SHOP_TAX_MINUS_1 = 185;
-    public static final int BUTTON_SELECTED_SHOP_TAX_PLUS_1 = 186;
-    public static final int BUTTON_SELECTED_SHOP_TAX_PLUS_10 = 187;
+    public static final int BUTTON_SELECTED_SHOP_TAX_MINUS_10 = 124;
+    public static final int BUTTON_SELECTED_SHOP_TAX_MINUS_1 = 125;
+    public static final int BUTTON_SELECTED_SHOP_TAX_PLUS_1 = 126;
+    public static final int BUTTON_SELECTED_SHOP_TAX_PLUS_10 = 127;
 
     public static final int BUTTON_SKIP_RECON_ENTRY_BASE = 40000;
-    public static final int BUTTON_STOP_RECONSTRUCTION = 1000000;
 
     private static final int DATA_SELECTED_TAB = 0;
     private static final int DATA_RESIDENT_PAGE = 1;
