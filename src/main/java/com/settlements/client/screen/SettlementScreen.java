@@ -236,6 +236,7 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
 
             int index = residentPage * LIST_ROWS + row;
             if (index >= 0 && index < menu.getResidentViews().size()) {
+                menu.clientSelectResident(index);
                 pressButton(SettlementMenu.BUTTON_SELECT_RESIDENT_BASE + index);
             }
             return;
@@ -421,7 +422,7 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
                 visiblePermissionOrdinals[row] = permission.ordinal();
                 permissionButtons[row].visible = true;
                 permissionButtons[row].active = !menu.isSelectedResidentLeader();
-                permissionButtons[row].setMessage(Component.literal(menu.selectedResidentHasPermission(permission) ? "Вкл" : "Выкл"));
+                permissionButtons[row].setMessage(Component.literal(menu.selectedResidentViewHasPermission(permission) ? "Вкл" : "Выкл"));
             }
         }
 
@@ -580,12 +581,12 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
             graphics.drawString(this.font, "UUID: " + shorten(selected.getPlayerUuid(), 22), 140, 90, 0xC8C8C8, false);
 
             String debtText = menu.canViewSelectedResidentDebt()
-                    ? String.valueOf(menu.getSelectedResidentPersonalDebt())
+                    ? String.valueOf(menu.getSelectedResidentViewPersonalDebt())
                     : "скрыт";
             graphics.drawString(this.font, "Личный долг: " + debtText, 140, 102, 0xFFD8A8, false);
 
-            graphics.drawString(this.font, "Личный налог: " + menu.getSelectedResidentPersonalTaxAmount(), 140, 114, 0xFFFFFF, false);
-            graphics.drawString(this.font, "Налог магазинов: " + menu.getSelectedResidentShopTaxPercent() + "%", 140, 136, 0xFFFFFF, false);
+            graphics.drawString(this.font, "Личный налог: " + menu.getSelectedResidentViewPersonalTaxAmount(), 140, 114, 0xFFFFFF, false);
+            graphics.drawString(this.font, "Налог магазинов: " + menu.getSelectedResidentViewShopTaxPercent() + "%", 140, 136, 0xFFFFFF, false);
         } else {
             if (!menu.canViewResidentPermissionPage()) {
                 graphics.drawString(this.font, "Нет права смотреть права жителей.", 140, 84, 0xFFB0B0, false);
@@ -602,7 +603,7 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
 
                 SettlementPermission permission = permissions[index];
                 int y = 84 + row * 14;
-                int color = menu.selectedResidentHasPermission(permission) ? 0xA8FFA8 : 0xFFB0B0;
+                int color = menu.selectedResidentViewHasPermission(permission) ? 0xA8FFA8 : 0xFFB0B0;
                 graphics.drawString(this.font, shorten(formatPermissionName(permission), 22), 140, y, color, false);
             }
         }

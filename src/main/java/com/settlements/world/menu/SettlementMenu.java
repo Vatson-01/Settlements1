@@ -815,7 +815,29 @@ public class SettlementMenu extends AbstractContainerMenu {
         long high = Integer.toUnsignedLong(menuData.get(DATA_TREASURY_HIGH));
         return low | (high << 32);
     }
+    public SettlementResidentView getSelectedResidentView() {
+        return getResidentViewByIndex(getSelectedResidentIndex());
+    }
 
+    public boolean selectedResidentViewHasPermission(SettlementPermission permission) {
+        SettlementResidentView view = getSelectedResidentView();
+        return view != null && view.hasPermission(permission);
+    }
+
+    public long getSelectedResidentViewPersonalTaxAmount() {
+        SettlementResidentView view = getSelectedResidentView();
+        return view == null ? 0L : view.getPersonalTaxAmount();
+    }
+
+    public long getSelectedResidentViewPersonalDebt() {
+        SettlementResidentView view = getSelectedResidentView();
+        return view == null ? 0L : view.getPersonalDebt();
+    }
+
+    public int getSelectedResidentViewShopTaxPercent() {
+        SettlementResidentView view = getSelectedResidentView();
+        return view == null ? 0 : view.getShopTaxPercent();
+    }
     public long getSettlementDebt() {
         long low = Integer.toUnsignedLong(menuData.get(DATA_SETTLEMENT_DEBT_LOW));
         long high = Integer.toUnsignedLong(menuData.get(DATA_SETTLEMENT_DEBT_HIGH));
