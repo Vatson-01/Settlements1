@@ -1080,7 +1080,12 @@ public class SettlementMenu extends AbstractContainerMenu {
                 return false;
             }
             menuData.set(DATA_SELECTED_RESIDENT_INDEX, buttonId - BUTTON_SELECT_RESIDENT_BASE);
-            broadcastChanges();
+
+            if (player instanceof ServerPlayer) {
+                reopenFor((ServerPlayer) player);
+            } else {
+                broadcastChanges();
+            }
             return true;
         }
 

@@ -141,15 +141,15 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
             addRenderableWidget(permissionButtons[i]);
         }
 
-        personalTaxMinus100Button = smallButton(left + 156, top + 128, "-100", button -> pressButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_MINUS_100));
-        personalTaxMinus10Button = smallButton(left + 205, top + 128, "-10", button -> pressButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_MINUS_10));
-        personalTaxPlus10Button = smallButton(left + 254, top + 128, "+10", button -> pressButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_PLUS_10));
-        personalTaxPlus100Button = smallButton(left + 303, top + 128, "+100", button -> pressButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_PLUS_100));
+        personalTaxMinus100Button = smallButton(left + 156, top + 128, "-100", button -> pressResidentScopedButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_MINUS_100));
+        personalTaxMinus10Button = smallButton(left + 205, top + 128, "-10", button -> pressResidentScopedButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_MINUS_10));
+        personalTaxPlus10Button = smallButton(left + 254, top + 128, "+10", button -> pressResidentScopedButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_PLUS_10));
+        personalTaxPlus100Button = smallButton(left + 303, top + 128, "+100", button -> pressResidentScopedButton(SettlementMenu.BUTTON_SELECTED_PERSONAL_TAX_PLUS_100));
 
-        shopTaxMinus10Button = smallButton(left + 156, top + 150, "-10", button -> pressButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_MINUS_10));
-        shopTaxMinus1Button = smallButton(left + 205, top + 150, "-1", button -> pressButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_MINUS_1));
-        shopTaxPlus1Button = smallButton(left + 254, top + 150, "+1", button -> pressButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_PLUS_1));
-        shopTaxPlus10Button = smallButton(left + 303, top + 150, "+10", button -> pressButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_PLUS_10));
+        shopTaxMinus10Button = smallButton(left + 156, top + 150, "-10", button -> pressResidentScopedButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_MINUS_10));
+        shopTaxMinus1Button = smallButton(left + 205, top + 150, "-1", button -> pressResidentScopedButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_MINUS_1));
+        shopTaxPlus1Button = smallButton(left + 254, top + 150, "+1", button -> pressResidentScopedButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_PLUS_1));
+        shopTaxPlus10Button = smallButton(left + 303, top + 150, "+10", button -> pressResidentScopedButton(SettlementMenu.BUTTON_SELECTED_SHOP_TAX_PLUS_10));
 
         addRenderableWidget(personalTaxMinus100Button);
         addRenderableWidget(personalTaxMinus10Button);
@@ -186,6 +186,14 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         addRenderableWidget(stopReconstructionButton);
 
         updateButtons();
+    }
+
+    private void pressResidentScopedButton(int actionButtonId) {
+        int selectedIndex = menu.getSelectedResidentIndex();
+        if (selectedIndex >= 0 && selectedIndex < menu.getResidentViews().size()) {
+            pressButton(SettlementMenu.BUTTON_SELECT_RESIDENT_BASE + selectedIndex);
+        }
+        pressButton(actionButtonId);
     }
 
     private Button smallButton(int x, int y, String label, Button.OnPress onPress) {
@@ -276,7 +284,7 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         if (ordinal < 0 || ordinal >= SettlementPermission.values().length) {
             return;
         }
-        pressButton(SettlementMenu.BUTTON_TOGGLE_SELECTED_PERMISSION_BASE + ordinal);
+        pressResidentScopedButton(SettlementMenu.BUTTON_TOGGLE_SELECTED_PERMISSION_BASE + ordinal);
     }
 
     @Override
