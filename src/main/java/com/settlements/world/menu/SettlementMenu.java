@@ -45,15 +45,15 @@ public class SettlementMenu extends AbstractContainerMenu {
     public static final int BUTTON_SELECT_RESIDENT_BASE = 20;
     public static final int BUTTON_TOGGLE_SELECTED_PERMISSION_BASE = 100;
 
-    public static final int BUTTON_SELECTED_PERSONAL_TAX_MINUS_100 = 120;
-    public static final int BUTTON_SELECTED_PERSONAL_TAX_MINUS_10 = 121;
-    public static final int BUTTON_SELECTED_PERSONAL_TAX_PLUS_10 = 122;
-    public static final int BUTTON_SELECTED_PERSONAL_TAX_PLUS_100 = 123;
+    public static final int BUTTON_SELECTED_PERSONAL_TAX_MINUS_100 = 140;
+    public static final int BUTTON_SELECTED_PERSONAL_TAX_MINUS_10 = 141;
+    public static final int BUTTON_SELECTED_PERSONAL_TAX_PLUS_10 = 142;
+    public static final int BUTTON_SELECTED_PERSONAL_TAX_PLUS_100 = 143;
 
-    public static final int BUTTON_SELECTED_SHOP_TAX_MINUS_10 = 124;
-    public static final int BUTTON_SELECTED_SHOP_TAX_MINUS_1 = 125;
-    public static final int BUTTON_SELECTED_SHOP_TAX_PLUS_1 = 126;
-    public static final int BUTTON_SELECTED_SHOP_TAX_PLUS_10 = 127;
+    public static final int BUTTON_SELECTED_SHOP_TAX_MINUS_10 = 144;
+    public static final int BUTTON_SELECTED_SHOP_TAX_MINUS_1 = 145;
+    public static final int BUTTON_SELECTED_SHOP_TAX_PLUS_1 = 146;
+    public static final int BUTTON_SELECTED_SHOP_TAX_PLUS_10 = 147;
 
     public static final int BUTTON_SKIP_RECON_ENTRY_BASE = 40000;
 
@@ -1178,14 +1178,17 @@ public class SettlementMenu extends AbstractContainerMenu {
             return true;
         }
 
-        if (buttonId >= BUTTON_SELECT_RESIDENT_BASE && buttonId < BUTTON_TOGGLE_SELECTED_PERMISSION_BASE) {
+        if (buttonId >= BUTTON_SELECT_RESIDENT_BASE && buttonId < BUTTON_SELECT_RESIDENT_BASE + 7) {
             if (!canAccessResidentsTab()) {
                 return false;
             }
-            int selectedIndex = buttonId - BUTTON_SELECT_RESIDENT_BASE;
+
+            int row = buttonId - BUTTON_SELECT_RESIDENT_BASE;
+            int selectedIndex = getResidentPage() * 7 + row;
             if (selectedIndex < 0 || selectedIndex >= residentViews.size()) {
                 return false;
             }
+
             menuData.set(DATA_SELECTED_RESIDENT_INDEX, selectedIndex);
             broadcastChanges();
             return true;
@@ -1203,30 +1206,6 @@ public class SettlementMenu extends AbstractContainerMenu {
             SettlementMember self = settlement == null ? null : settlement.getMember(serverPlayer.getUUID());
             ReconstructionSession reconstruction = data.getActiveReconstructionForSettlement(settlementId);
 
-            if (buttonId >= BUTTON_TOGGLE_SELECTED_PERMISSION_BASE
-                    && buttonId < BUTTON_TOGGLE_SELECTED_PERMISSION_BASE + SettlementPermission.values().length) {
-                int permissionOrdinal = buttonId - BUTTON_TOGGLE_SELECTED_PERMISSION_BASE;
-
-                if (permissionOrdinal < 0 || permissionOrdinal >= SettlementPermission.values().length) {
-                    return false;
-                }
-
-                SettlementMember selectedResident = resolveSelectedResidentFromViews(settlement);
-                if (!canEditResidentPermissions(this.residentViews, serverPlayer, settlement, self, selectedResident)) {
-                    throw new IllegalStateException("Нет права на изменение прав этого жителя.");
-                }
-
-                SettlementPermission permission = SettlementPermission.values()[permissionOrdinal];
-                if (selectedResident.getPermissionSet().has(permission)) {
-                    selectedResident.getPermissionSet().revoke(permission);
-                } else {
-                    selectedResident.getPermissionSet().grant(permission);
-                }
-
-                data.setDirty();
-                refreshOpenMenusForSettlement(serverPlayer, settlementId);
-                return true;
-            }
 
             if (buttonId == BUTTON_SELECTED_PERSONAL_TAX_MINUS_100
                     || buttonId == BUTTON_SELECTED_PERSONAL_TAX_MINUS_10
@@ -1293,6 +1272,31 @@ public class SettlementMenu extends AbstractContainerMenu {
                 }
                 ReconstructionService.openStorage(serverPlayer);
                 broadcastChanges();
+                return true;
+            }
+
+            if (buttonId >= BUTTON_TOGGLE_SELECTED_PERMISSION_BASE
+                    && buttonId < BUTTON_TOGGLE_SELECTED_PERMISSION_BASE + SettlementPermission.values().length) {
+                int permissionOrdinal = buttonId - BUTTON_TOGGLE_SELECTED_PERMISSION_BASE;
+
+                if (permissionOrdinal < 0 || permissionOrdinal >= SettlementPermission.values().length) {
+                    return false;
+                }
+
+                SettlementMember selectedResident = resolveSelectedResidentFromViews(settlement);
+                if (!canEditResidentPermissions(this.residentViews, serverPlayer, settlement, self, selectedResident)) {
+                    throw new IllegalStateException("Нет права на изменение прав этого жителя.");
+                }
+
+                SettlementPermission permission = SettlementPermission.values()[permissionOrdinal];
+                if (selectedResident.getPermissionSet().has(permission)) {
+                    selectedResident.getPermissionSet().revoke(permission);
+                } else {
+                    selectedResident.getPermissionSet().grant(permission);
+                }
+
+                data.setDirty();
+                refreshOpenMenusForSettlement(serverPlayer, settlementId);
                 return true;
             }
 
