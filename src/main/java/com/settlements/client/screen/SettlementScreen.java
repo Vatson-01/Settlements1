@@ -98,11 +98,17 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
             addRenderableWidget(listButtons[i]);
         }
 
-        reconstructionResourcesModeButton = Button.builder(Component.literal("Нужные блоки"), button -> reconstructionPanelMode = ReconstructionPanelMode.RESOURCES)
+        reconstructionResourcesModeButton = Button.builder(Component.literal("Нужные блоки"), button -> {
+                    reconstructionPanelMode = ReconstructionPanelMode.RESOURCES;
+                    reconstructionPage = 0;
+                })
                 .bounds(left + 140, top + 56, 96, 18)
                 .build();
 
-        reconstructionBlocksModeButton = Button.builder(Component.literal("Координаты"), button -> reconstructionPanelMode = ReconstructionPanelMode.BLOCKS)
+        reconstructionBlocksModeButton = Button.builder(Component.literal("Координаты"), button -> {
+                    reconstructionPanelMode = ReconstructionPanelMode.BLOCKS;
+                    reconstructionPage = 0;
+                })
                 .bounds(left + 240, top + 56, 86, 18)
                 .build();
 
@@ -117,6 +123,7 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         stopReconstructionButton = Button.builder(Component.literal("Остановить"), button -> {
                     pressButton(SettlementMenu.BUTTON_STOP_RECONSTRUCTION);
                     reconstructionPanelMode = ReconstructionPanelMode.RESOURCES;
+                    reconstructionPage = 0;
                 })
                 .bounds(left + 140, top + 104, 212, 18)
                 .build();
@@ -156,6 +163,7 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
             if (index >= 0 && index < resources.size()) {
                 selectedResourceKey = resources.get(index).itemId;
                 reconstructionPanelMode = ReconstructionPanelMode.BLOCKS;
+                reconstructionPage = 0;
             }
             return;
         }
@@ -195,13 +203,15 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         }
 
         warPage = clampPage(warPage, getWarMaxPage());
-        reconstructionPage = clampPage(reconstructionPage,
-                reconstructionPanelMode == ReconstructionPanelMode.BLOCKS
-                        ? getReconstructionBlockMaxPage()
-                        : getReconstructionResourceMaxPage());
+
+        int reconstructionMaxPage = reconstructionPanelMode == ReconstructionPanelMode.BLOCKS
+                ? getReconstructionBlockMaxPage()
+                : getReconstructionResourceMaxPage();
+        reconstructionPage = clampPage(reconstructionPage, reconstructionMaxPage);
 
         if (reconstructionPanelMode == ReconstructionPanelMode.BLOCKS && selectedResourceKey == null) {
             reconstructionPanelMode = ReconstructionPanelMode.RESOURCES;
+            reconstructionPage = 0;
         }
     }
 

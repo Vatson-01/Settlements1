@@ -29,8 +29,8 @@ import java.util.List;
 import java.util.UUID;
 
 public class SettlementMenu extends AbstractContainerMenu {
-    public static final int RECON_PAGE_SIZE = 7;
     public static final int WAR_PAGE_SIZE = 5;
+    public static final int RECON_PAGE_SIZE = 7;
 
     public static final int BUTTON_TAB_OVERVIEW = 0;
     public static final int BUTTON_TAB_WAR = 1;
