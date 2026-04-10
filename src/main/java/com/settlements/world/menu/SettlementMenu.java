@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.UUID;
 
 public class SettlementMenu extends AbstractContainerMenu {
-    public static final int PAGE_SIZE = 10;
+    public static final int PAGE_SIZE = 7;
 
     public static final int BUTTON_TAB_OVERVIEW = 0;
     public static final int BUTTON_TAB_RESIDENTS = 1;

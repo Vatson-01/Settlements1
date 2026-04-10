@@ -69,6 +69,17 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
     }
 
     @Override
+    protected void containerTick() {
+        super.containerTick();
+
+        this.residentPage = menu.getResidentPage();
+        this.warPage = menu.getWarPage();
+
+        ensureSelections();
+        updateButtons();
+    }
+
+    @Override
     protected void init() {
         super.init();
 
@@ -88,10 +99,11 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
                 .bounds(left + 266, top + 6, 86, 20)
                 .build();
 
-        prevPageButton = Button.builder(Component.literal("<"), button -> stepPage(-1))
+        prevPageButton = Button.builder(Component.literal("<"), button -> pressButton(SettlementMenu.BUTTON_PAGE_PREV))
                 .bounds(left + 278, top + 34, 24, 18)
                 .build();
-        nextPageButton = Button.builder(Component.literal(">"), button -> stepPage(1))
+
+        nextPageButton = Button.builder(Component.literal(">"), button -> pressButton(SettlementMenu.BUTTON_PAGE_NEXT))
                 .bounds(left + 306, top + 34, 24, 18)
                 .build();
 
@@ -236,8 +248,7 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
 
             int index = residentPage * LIST_ROWS + row;
             if (index >= 0 && index < menu.getResidentViews().size()) {
-                menu.clientSelectResident(index);
-                pressButton(SettlementMenu.BUTTON_SELECT_RESIDENT_BASE + index);
+                pressButton(SettlementMenu.BUTTON_SELECT_RESIDENT_BASE + row);
             }
             return;
         }
@@ -277,13 +288,6 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
             return;
         }
         pressButton(SettlementMenu.BUTTON_TOGGLE_SELECTED_PERMISSION_BASE + ordinal);
-    }
-
-    @Override
-    protected void containerTick() {
-        super.containerTick();
-        ensureSelections();
-        updateButtons();
     }
 
     private void ensureSelections() {
