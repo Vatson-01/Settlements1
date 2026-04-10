@@ -6,36 +6,34 @@ import com.mojang.brigadier.arguments.LongArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import com.settlements.SettlementsMod;
-import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.settlements.data.SettlementSavedData;
 import com.settlements.data.model.PlotPermission;
-import com.settlements.data.model.ReconstructionSession;
-import com.settlements.service.SettlementMenuService;
-import com.settlements.service.ReconstructionService;
 import com.settlements.data.model.PlotPermissionSet;
+import com.settlements.data.model.ReconstructionBlockEntry;
+import com.settlements.data.model.ReconstructionSession;
 import com.settlements.data.model.Settlement;
 import com.settlements.data.model.SettlementMember;
 import com.settlements.data.model.SettlementPlot;
 import com.settlements.data.model.ShopRecord;
 import com.settlements.data.model.ShopTradeEntry;
 import com.settlements.data.model.SiegeState;
-import com.settlements.data.model.ReconstructionSession;
 import com.settlements.data.model.WarRecord;
 import com.settlements.service.ClaimService;
 import com.settlements.service.CurrencyService;
 import com.settlements.service.PlotService;
+import com.settlements.service.ReconstructionRestoreResult;
+import com.settlements.service.ReconstructionService;
+import com.settlements.service.SettlementMenuService;
 import com.settlements.service.SettlementService;
 import com.settlements.service.ShopService;
 import com.settlements.service.TaxService;
-import com.settlements.data.model.ReconstructionBlockEntry;
-import com.settlements.data.model.ReconstructionSession;
-import com.settlements.service.ReconstructionRestoreResult;
-import com.settlements.service.ReconstructionService;
 import com.settlements.service.TreasuryService;
 import com.settlements.service.WarService;
+import com.settlements.world.menu.SettlementResidentManageMenu;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
@@ -43,6 +41,7 @@ import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
+import com.settlements.world.menu.SettlementResidentsMenu;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -85,6 +84,8 @@ public final class SettlementDebugCommands {
                         .then(buildSiegeNode())
                         .then(buildReconstructionNode())
                         .then(buildSettlementMenuNode())
+                        .then(buildResidentManageMenuNode())
+                        .then(buildResidentsMenuNode())
         );
     }
 
@@ -105,7 +106,53 @@ public final class SettlementDebugCommands {
         return Commands.literal("menu")
                 .executes(SettlementDebugCommands::openSettlementMenu);
     }
+    private static LiteralArgumentBuilder<CommandSourceStack> buildResidentManageMenuNode() {
+        return Commands.literal("residentmenu")
+                .then(Commands.argument("player", EntityArgument.player())
+                        .executes(SettlementDebugCommands::openResidentManageMenu));
+    }
+    private static LiteralArgumentBuilder<CommandSourceStack> buildResidentsMenuNode() {
+        return Commands.literal("residentsmenu")
+                .executes(SettlementDebugCommands::openResidentsMenu);
+    }
 
+    private static int openResidentsMenu(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer actor = source.getPlayerOrException();
+
+        SettlementSavedData data = SettlementSavedData.get(actor.server);
+        Settlement settlement = data.getSettlementByPlayer(actor.getUUID());
+        if (settlement == null) {
+            source.sendFailure(Component.literal("Ты не состоишь в поселении."));
+            return 0;
+        }
+
+        SettlementResidentsMenu.openFor(actor, settlement.getId());
+        source.sendSuccess(() -> Component.literal("Открыт список жителей поселения."), true);
+        return 1;
+    }
+    private static int openResidentManageMenu(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer actor = source.getPlayerOrException();
+        ServerPlayer target = EntityArgument.getPlayer(context, "player");
+
+        SettlementSavedData data = SettlementSavedData.get(actor.server);
+        Settlement settlement = data.getSettlementByPlayer(actor.getUUID());
+        if (settlement == null) {
+            source.sendFailure(Component.literal("Ты не состоишь в поселении."));
+            return 0;
+        }
+
+        SettlementMember targetMember = settlement.getMember(target.getUUID());
+        if (targetMember == null) {
+            source.sendFailure(Component.literal("Этот игрок не состоит в твоем поселении."));
+            return 0;
+        }
+
+        SettlementResidentManageMenu.openFor(actor, settlement.getId(), target.getUUID());
+        source.sendSuccess(() -> Component.literal("Открыто меню жителя: " + target.getGameProfile().getName()), true);
+        return 1;
+    }
     private static int openSettlementMenu(CommandContext<CommandSourceStack> context) {
         CommandSourceStack source = context.getSource();
 

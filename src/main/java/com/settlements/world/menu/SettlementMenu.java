@@ -11,6 +11,9 @@ import com.settlements.data.model.WarRecord;
 import com.settlements.registry.ModMenuTypes;
 import com.settlements.service.ReconstructionRestoreResult;
 import com.settlements.service.ReconstructionService;
+import com.mojang.authlib.GameProfile;
+import net.minecraft.server.players.GameProfileCache;
+import java.util.Optional;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -208,6 +211,18 @@ public class SettlementMenu extends AbstractContainerMenu {
         if (online != null) {
             return online.getGameProfile().getName();
         }
+
+        GameProfileCache cache = opener.server.getProfileCache();
+        if (cache != null) {
+            Optional<GameProfile> profile = cache.get(playerUuid);
+            if (profile.isPresent()) {
+                String name = profile.get().getName();
+                if (name != null && !name.isEmpty()) {
+                    return name;
+                }
+            }
+        }
+
         return playerUuid.toString();
     }
 

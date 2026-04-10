@@ -10,6 +10,7 @@ import com.settlements.world.menu.SettlementResidentManageMenu;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
+import com.settlements.world.menu.SettlementResidentsMenu;
 import net.minecraftforge.registries.RegistryObject;
 
 public final class ModMenuTypes {
@@ -21,7 +22,8 @@ public final class ModMenuTypes {
 
     public static final RegistryObject<MenuType<ShopManagementMenu>> SHOP_MANAGEMENT_MENU =
             MENU_TYPES.register("shop_management_menu", () -> IForgeMenuType.create(ShopManagementMenu::new));
-
+    public static final RegistryObject<MenuType<SettlementResidentsMenu>> SETTLEMENT_RESIDENTS_MENU =
+            MENU_TYPES.register("settlement_residents_menu", () -> IForgeMenuType.create(SettlementResidentsMenu::new));
     public static final RegistryObject<MenuType<SettlementMenu>> SETTLEMENT_MENU =
             MENU_TYPES.register("settlement_menu", () -> IForgeMenuType.create(SettlementMenu::new));
     public static final RegistryObject<MenuType<SettlementResidentManageMenu>> SETTLEMENT_RESIDENT_MANAGE_MENU =

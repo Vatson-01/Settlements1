@@ -1,5 +1,6 @@
 package com.settlements.world.menu;
 
+import com.mojang.authlib.GameProfile;
 import com.settlements.data.SettlementSavedData;
 import com.settlements.data.model.Settlement;
 import com.settlements.data.model.SettlementMember;
@@ -8,6 +9,7 @@ import com.settlements.registry.ModMenuTypes;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.players.GameProfileCache;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -18,6 +20,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.network.NetworkHooks;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public class SettlementResidentManageMenu extends AbstractContainerMenu {
@@ -36,7 +39,10 @@ public class SettlementResidentManageMenu extends AbstractContainerMenu {
     public static final int BUTTON_SHOP_TAX_PLUS_1 = 26;
     public static final int BUTTON_SHOP_TAX_PLUS_10 = 27;
 
-    public static final int BUTTON_TOGGLE_PERMISSION_BASE = 100;
+    public static final int BUTTON_ACCRUE_PERSONAL_DEBT = 28;
+    public static final int BUTTON_CLEAR_PERSONAL_DEBT = 29;
+
+    public static final int BUTTON_TOGGLE_PERMISSION_BASE = 40;
 
     private static final int DATA_PERMISSION_PAGE = 0;
     private static final int DATA_TARGET_EXISTS = 1;
@@ -63,7 +69,8 @@ public class SettlementResidentManageMenu extends AbstractContainerMenu {
     private static final int DATA_TARGET_DEBT_WORD_2 = 19;
     private static final int DATA_TARGET_DEBT_WORD_3 = 20;
 
-    private static final int DATA_COUNT = 21;
+    private static final int DATA_CAN_ACCRUE_PERSONAL_DEBT = 21;
+    private static final int DATA_COUNT = 22;
 
     private final UUID settlementId;
     private final UUID targetPlayerUuid;
@@ -147,7 +154,9 @@ public class SettlementResidentManageMenu extends AbstractContainerMenu {
         }
 
         SettlementMember target = settlement.getMember(targetPlayerUuid);
-        String targetName = target == null ? targetPlayerUuid.toString() : resolvePlayerName(serverPlayer, target.getPlayerUuid());
+        String targetName = target == null
+                ? targetPlayerUuid.toString()
+                : resolvePlayerName(serverPlayer, target.getPlayerUuid());
 
         return new OpenData(
                 settlementId,
@@ -155,11 +164,6 @@ public class SettlementResidentManageMenu extends AbstractContainerMenu {
                 settlement.getName(),
                 targetName
         );
-    }
-
-    public static void writeOpenData(FriendlyByteBuf buf, ServerPlayer player, UUID settlementId, UUID targetPlayerUuid) {
-        OpenData openData = buildOpenData(player.getInventory(), settlementId, targetPlayerUuid);
-        openData.write(buf);
     }
 
     private static ContainerData createClientData() {
@@ -232,6 +236,9 @@ public class SettlementResidentManageMenu extends AbstractContainerMenu {
                 if (index == DATA_TARGET_SHOP_TAX) {
                     return target == null ? 0 : target.getShopTaxPercent();
                 }
+                if (index == DATA_CAN_ACCRUE_PERSONAL_DEBT) {
+                    return canEditPersonalTax(settlement, self, target, actorUuid) ? 1 : 0;
+                }
 
                 long permissionMask = encodePermissionMask(target);
                 if (index == DATA_PERMISSION_MASK_WORD_0) {
@@ -302,6 +309,18 @@ public class SettlementResidentManageMenu extends AbstractContainerMenu {
         if (online != null) {
             return online.getGameProfile().getName();
         }
+
+        GameProfileCache cache = opener.server.getProfileCache();
+        if (cache != null) {
+            Optional<GameProfile> profile = cache.get(playerUuid);
+            if (profile.isPresent()) {
+                String name = profile.get().getName();
+                if (name != null && !name.isEmpty()) {
+                    return name;
+                }
+            }
+        }
+
         return playerUuid.toString();
     }
 
@@ -469,6 +488,14 @@ public class SettlementResidentManageMenu extends AbstractContainerMenu {
         return menuData.get(DATA_CAN_VIEW_PERMISSIONS) != 0;
     }
 
+    public boolean canAccruePersonalDebt() {
+        return menuData.get(DATA_CAN_ACCRUE_PERSONAL_DEBT) != 0;
+    }
+
+    public boolean canClearPersonalDebt() {
+        return menuData.get(DATA_CAN_ACCRUE_PERSONAL_DEBT) != 0;
+    }
+
     public int getTargetShopTaxPercent() {
         return menuData.get(DATA_TARGET_SHOP_TAX);
     }
@@ -522,6 +549,47 @@ public class SettlementResidentManageMenu extends AbstractContainerMenu {
 
             if (settlement == null || target == null) {
                 throw new IllegalStateException("Житель не найден.");
+            }
+
+            if (buttonId == BUTTON_ACCRUE_PERSONAL_DEBT) {
+                if (!canEditPersonalTax(settlement, self, target, serverPlayer.getUUID())) {
+                    throw new IllegalStateException("Нет права начислять личный долг.");
+                }
+
+                long accrued = target.getPersonalTaxAmount();
+                if (accrued < 0L) {
+                    accrued = 0L;
+                }
+
+                long updatedDebt = target.getPersonalTaxDebt() + accrued;
+                if (updatedDebt < 0L) {
+                    updatedDebt = 0L;
+                }
+
+                target.setPersonalTaxDebt(updatedDebt);
+                data.setDirty();
+                broadcastChanges();
+                refreshOtherOpenMenusForTarget(serverPlayer, settlementId, targetPlayerUuid);
+                serverPlayer.displayClientMessage(Component.literal("Начислен личный долг: " + accrued), true);
+                return true;
+            }
+
+            if (buttonId == BUTTON_CLEAR_PERSONAL_DEBT) {
+                if (!canEditPersonalTax(settlement, self, target, serverPlayer.getUUID())) {
+                    throw new IllegalStateException("Нет права списывать личный долг.");
+                }
+
+                long cleared = target.getPersonalTaxDebt();
+                if (cleared < 0L) {
+                    cleared = 0L;
+                }
+
+                target.setPersonalTaxDebt(0L);
+                data.setDirty();
+                broadcastChanges();
+                refreshOtherOpenMenusForTarget(serverPlayer, settlementId, targetPlayerUuid);
+                serverPlayer.displayClientMessage(Component.literal("Списан личный долг: " + cleared), true);
+                return true;
             }
 
             if (buttonId == BUTTON_PERSONAL_TAX_MINUS_100
