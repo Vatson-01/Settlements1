@@ -17,6 +17,10 @@ public final class TreasuryService {
 
         requirePlayerOnOwnSettlementTerritory(data, player, settlement);
 
+        if (!canDeposit(settlement, player)) {
+            throw new IllegalStateException("У игрока нет права на пополнение казны.");
+        }
+
         long amount = CurrencyService.removeAllCurrencyFromPlayer(player);
         if (amount <= 0L) {
             throw new IllegalStateException("У игрока нет монет для пополнения казны.");
@@ -37,6 +41,10 @@ public final class TreasuryService {
         Settlement settlement = requirePlayerSettlement(data, player);
 
         requirePlayerOnOwnSettlementTerritory(data, player, settlement);
+
+        if (!canDeposit(settlement, player)) {
+            throw new IllegalStateException("У игрока нет права на пополнение казны.");
+        }
 
         boolean removed = CurrencyService.removeCurrencyAmountFromPlayer(player, amount);
         if (!removed) {
@@ -103,6 +111,15 @@ public final class TreasuryService {
         if (!territorySettlement.getId().equals(playerSettlement.getId())) {
             throw new IllegalStateException("Операции с казной можно выполнять только на территории своего поселения.");
         }
+    }
+
+    private static boolean canDeposit(Settlement settlement, ServerPlayer player) {
+        if (settlement.isLeader(player.getUUID())) {
+            return true;
+        }
+
+        SettlementMember member = settlement.getMember(player.getUUID());
+        return member != null && member.getPermissionSet().has(SettlementPermission.DEPOSIT_TREASURY);
     }
 
     private static boolean canWithdraw(Settlement settlement, ServerPlayer player) {

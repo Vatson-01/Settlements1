@@ -20,6 +20,7 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
 
     private Button overviewTabButton;
     private Button warTabButton;
+    private Button treasuryTabButton;
     private Button reconstructionTabButton;
     private Button prevPageButton;
     private Button nextPageButton;
@@ -31,6 +32,29 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
     private Button openStorageButton;
     private Button restoreButton;
     private Button stopReconstructionButton;
+
+    private Button personalDebtMinus1000Button;
+    private Button personalDebtMinus100Button;
+    private Button personalDebtMinus10Button;
+    private Button personalDebtMinus1Button;
+    private Button personalDebtPlus1Button;
+    private Button personalDebtPlus10Button;
+    private Button personalDebtPlus100Button;
+    private Button personalDebtPlus1000Button;
+    private Button personalDebtPayButton;
+    private Button personalDebtPayAllButton;
+
+    private Button treasuryMinus1000Button;
+    private Button treasuryMinus100Button;
+    private Button treasuryMinus10Button;
+    private Button treasuryMinus1Button;
+    private Button treasuryPlus1Button;
+    private Button treasuryPlus10Button;
+    private Button treasuryPlus100Button;
+    private Button treasuryPlus1000Button;
+    private Button treasuryDepositButton;
+    private Button treasuryWithdrawButton;
+    private Button treasuryDepositAllButton;
 
     private int warPage;
     private int reconstructionPage;
@@ -63,15 +87,19 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         int top = this.topPos;
 
         overviewTabButton = Button.builder(Component.literal("Обзор"), button -> pressButton(SettlementMenu.BUTTON_TAB_OVERVIEW))
-                .bounds(left + 8, top + 6, 110, 20)
+                .bounds(left + 8, top + 6, 84, 20)
                 .build();
 
         warTabButton = Button.builder(Component.literal("Война"), button -> pressButton(SettlementMenu.BUTTON_TAB_WAR))
-                .bounds(left + 122, top + 6, 110, 20)
+                .bounds(left + 95, top + 6, 84, 20)
+                .build();
+
+        treasuryTabButton = Button.builder(Component.literal("Казна"), button -> pressButton(SettlementMenu.BUTTON_TAB_TREASURY))
+                .bounds(left + 182, top + 6, 84, 20)
                 .build();
 
         reconstructionTabButton = Button.builder(Component.literal("Реконструкция"), button -> pressButton(SettlementMenu.BUTTON_TAB_RECONSTRUCTION))
-                .bounds(left + 236, top + 6, 116, 20)
+                .bounds(left + 269, top + 6, 84, 20)
                 .build();
 
         prevPageButton = Button.builder(Component.literal("<"), button -> pressButton(SettlementMenu.BUTTON_PAGE_PREV))
@@ -84,6 +112,7 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
 
         addRenderableWidget(overviewTabButton);
         addRenderableWidget(warTabButton);
+        addRenderableWidget(treasuryTabButton);
         addRenderableWidget(reconstructionTabButton);
         addRenderableWidget(prevPageButton);
         addRenderableWidget(nextPageButton);
@@ -133,6 +162,113 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         addRenderableWidget(openStorageButton);
         addRenderableWidget(restoreButton);
         addRenderableWidget(stopReconstructionButton);
+
+        personalDebtMinus1000Button = Button.builder(Component.literal("-1000"), button -> pressButton(SettlementMenu.BUTTON_PERSONAL_DEBT_AMOUNT_MINUS_1000))
+                .bounds(left + 140, top + 106, 44, 16)
+                .build();
+
+        personalDebtMinus100Button = Button.builder(Component.literal("-100"), button -> pressButton(SettlementMenu.BUTTON_PERSONAL_DEBT_AMOUNT_MINUS_100))
+                .bounds(left + 188, top + 106, 44, 16)
+                .build();
+
+        personalDebtMinus10Button = Button.builder(Component.literal("-10"), button -> pressButton(SettlementMenu.BUTTON_PERSONAL_DEBT_AMOUNT_MINUS_10))
+                .bounds(left + 236, top + 106, 42, 16)
+                .build();
+
+        personalDebtMinus1Button = Button.builder(Component.literal("-1"), button -> pressButton(SettlementMenu.BUTTON_PERSONAL_DEBT_AMOUNT_MINUS_1))
+                .bounds(left + 282, top + 106, 42, 16)
+                .build();
+
+        personalDebtPlus1Button = Button.builder(Component.literal("+1"), button -> pressButton(SettlementMenu.BUTTON_PERSONAL_DEBT_AMOUNT_PLUS_1))
+                .bounds(left + 140, top + 124, 42, 16)
+                .build();
+
+        personalDebtPlus10Button = Button.builder(Component.literal("+10"), button -> pressButton(SettlementMenu.BUTTON_PERSONAL_DEBT_AMOUNT_PLUS_10))
+                .bounds(left + 186, top + 124, 42, 16)
+                .build();
+
+        personalDebtPlus100Button = Button.builder(Component.literal("+100"), button -> pressButton(SettlementMenu.BUTTON_PERSONAL_DEBT_AMOUNT_PLUS_100))
+                .bounds(left + 232, top + 124, 44, 16)
+                .build();
+
+        personalDebtPlus1000Button = Button.builder(Component.literal("+1000"), button -> pressButton(SettlementMenu.BUTTON_PERSONAL_DEBT_AMOUNT_PLUS_1000))
+                .bounds(left + 280, top + 124, 48, 16)
+                .build();
+
+        personalDebtPayButton = Button.builder(Component.literal("Оплатить"), button -> pressButton(SettlementMenu.BUTTON_PERSONAL_DEBT_PAY_SELECTED))
+                .bounds(left + 140, top + 142, 100, 16)
+                .build();
+
+        personalDebtPayAllButton = Button.builder(Component.literal("Оплатить все"), button -> pressButton(SettlementMenu.BUTTON_PERSONAL_DEBT_PAY_ALL))
+                .bounds(left + 244, top + 142, 108, 16)
+                .build();
+
+        treasuryMinus1000Button = Button.builder(Component.literal("-1000"), button -> pressButton(SettlementMenu.BUTTON_TREASURY_AMOUNT_MINUS_1000))
+                .bounds(left + 140, top + 106, 44, 16)
+                .build();
+
+        treasuryMinus100Button = Button.builder(Component.literal("-100"), button -> pressButton(SettlementMenu.BUTTON_TREASURY_AMOUNT_MINUS_100))
+                .bounds(left + 188, top + 106, 44, 16)
+                .build();
+
+        treasuryMinus10Button = Button.builder(Component.literal("-10"), button -> pressButton(SettlementMenu.BUTTON_TREASURY_AMOUNT_MINUS_10))
+                .bounds(left + 236, top + 106, 42, 16)
+                .build();
+
+        treasuryMinus1Button = Button.builder(Component.literal("-1"), button -> pressButton(SettlementMenu.BUTTON_TREASURY_AMOUNT_MINUS_1))
+                .bounds(left + 282, top + 106, 42, 16)
+                .build();
+
+        treasuryPlus1Button = Button.builder(Component.literal("+1"), button -> pressButton(SettlementMenu.BUTTON_TREASURY_AMOUNT_PLUS_1))
+                .bounds(left + 140, top + 124, 42, 16)
+                .build();
+
+        treasuryPlus10Button = Button.builder(Component.literal("+10"), button -> pressButton(SettlementMenu.BUTTON_TREASURY_AMOUNT_PLUS_10))
+                .bounds(left + 186, top + 124, 42, 16)
+                .build();
+
+        treasuryPlus100Button = Button.builder(Component.literal("+100"), button -> pressButton(SettlementMenu.BUTTON_TREASURY_AMOUNT_PLUS_100))
+                .bounds(left + 232, top + 124, 44, 16)
+                .build();
+
+        treasuryPlus1000Button = Button.builder(Component.literal("+1000"), button -> pressButton(SettlementMenu.BUTTON_TREASURY_AMOUNT_PLUS_1000))
+                .bounds(left + 280, top + 124, 48, 16)
+                .build();
+
+        treasuryDepositButton = Button.builder(Component.literal("Внести"), button -> pressButton(SettlementMenu.BUTTON_TREASURY_DEPOSIT_SELECTED))
+                .bounds(left + 140, top + 142, 64, 16)
+                .build();
+
+        treasuryWithdrawButton = Button.builder(Component.literal("Вывести"), button -> pressButton(SettlementMenu.BUTTON_TREASURY_WITHDRAW_SELECTED))
+                .bounds(left + 208, top + 142, 68, 16)
+                .build();
+
+        treasuryDepositAllButton = Button.builder(Component.literal("Внести все"), button -> pressButton(SettlementMenu.BUTTON_TREASURY_DEPOSIT_ALL))
+                .bounds(left + 280, top + 142, 72, 16)
+                .build();
+
+        addRenderableWidget(personalDebtMinus1000Button);
+        addRenderableWidget(personalDebtMinus100Button);
+        addRenderableWidget(personalDebtMinus10Button);
+        addRenderableWidget(personalDebtMinus1Button);
+        addRenderableWidget(personalDebtPlus1Button);
+        addRenderableWidget(personalDebtPlus10Button);
+        addRenderableWidget(personalDebtPlus100Button);
+        addRenderableWidget(personalDebtPlus1000Button);
+        addRenderableWidget(personalDebtPayButton);
+        addRenderableWidget(personalDebtPayAllButton);
+
+        addRenderableWidget(treasuryMinus1000Button);
+        addRenderableWidget(treasuryMinus100Button);
+        addRenderableWidget(treasuryMinus10Button);
+        addRenderableWidget(treasuryMinus1Button);
+        addRenderableWidget(treasuryPlus1Button);
+        addRenderableWidget(treasuryPlus10Button);
+        addRenderableWidget(treasuryPlus100Button);
+        addRenderableWidget(treasuryPlus1000Button);
+        addRenderableWidget(treasuryDepositButton);
+        addRenderableWidget(treasuryWithdrawButton);
+        addRenderableWidget(treasuryDepositAllButton);
 
         updateButtons();
     }
@@ -220,6 +356,7 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
 
         overviewTabButton.active = selectedTab != SettlementMenuTab.OVERVIEW;
         warTabButton.active = menu.canViewWarStatus() && selectedTab != SettlementMenuTab.WAR;
+        treasuryTabButton.active = selectedTab != SettlementMenuTab.TREASURY;
         reconstructionTabButton.active = selectedTab != SettlementMenuTab.RECONSTRUCTION;
 
         int currentPage = 0;
@@ -234,10 +371,11 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
                     : getReconstructionResourceMaxPage();
         }
 
-        prevPageButton.visible = selectedTab != SettlementMenuTab.OVERVIEW;
-        nextPageButton.visible = selectedTab != SettlementMenuTab.OVERVIEW;
-        prevPageButton.active = selectedTab != SettlementMenuTab.OVERVIEW && currentPage > 0;
-        nextPageButton.active = selectedTab != SettlementMenuTab.OVERVIEW && currentPage < maxPage;
+        boolean pagedTab = selectedTab == SettlementMenuTab.WAR || selectedTab == SettlementMenuTab.RECONSTRUCTION;
+        prevPageButton.visible = pagedTab;
+        nextPageButton.visible = pagedTab;
+        prevPageButton.active = pagedTab && currentPage > 0;
+        nextPageButton.active = pagedTab && currentPage < maxPage;
 
         for (int i = 0; i < LIST_ROWS; i++) {
             listButtons[i].visible = false;
@@ -289,6 +427,55 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         openStorageButton.active = reconstructionTab && menu.canOpenReconstructionStorage();
         restoreButton.active = reconstructionTab && menu.canRestoreReconstruction();
         stopReconstructionButton.active = reconstructionTab && menu.canStopReconstruction();
+
+        boolean overviewTab = selectedTab == SettlementMenuTab.OVERVIEW;
+        boolean treasuryTab = selectedTab == SettlementMenuTab.TREASURY;
+
+        personalDebtMinus1000Button.visible = overviewTab;
+        personalDebtMinus100Button.visible = overviewTab;
+        personalDebtMinus10Button.visible = overviewTab;
+        personalDebtMinus1Button.visible = overviewTab;
+        personalDebtPlus1Button.visible = overviewTab;
+        personalDebtPlus10Button.visible = overviewTab;
+        personalDebtPlus100Button.visible = overviewTab;
+        personalDebtPlus1000Button.visible = overviewTab;
+        personalDebtPayButton.visible = overviewTab;
+        personalDebtPayAllButton.visible = overviewTab;
+
+        personalDebtMinus1000Button.active = overviewTab;
+        personalDebtMinus100Button.active = overviewTab;
+        personalDebtMinus10Button.active = overviewTab;
+        personalDebtMinus1Button.active = overviewTab && menu.getPersonalDebtActionAmount() > 1L;
+        personalDebtPlus1Button.active = overviewTab;
+        personalDebtPlus10Button.active = overviewTab;
+        personalDebtPlus100Button.active = overviewTab;
+        personalDebtPlus1000Button.active = overviewTab;
+        personalDebtPayButton.active = overviewTab && menu.getPlayerDebt() > 0L;
+        personalDebtPayAllButton.active = overviewTab && menu.getPlayerDebt() > 0L;
+
+        treasuryMinus1000Button.visible = treasuryTab;
+        treasuryMinus100Button.visible = treasuryTab;
+        treasuryMinus10Button.visible = treasuryTab;
+        treasuryMinus1Button.visible = treasuryTab;
+        treasuryPlus1Button.visible = treasuryTab;
+        treasuryPlus10Button.visible = treasuryTab;
+        treasuryPlus100Button.visible = treasuryTab;
+        treasuryPlus1000Button.visible = treasuryTab;
+        treasuryDepositButton.visible = treasuryTab;
+        treasuryWithdrawButton.visible = treasuryTab;
+        treasuryDepositAllButton.visible = treasuryTab;
+
+        treasuryMinus1000Button.active = treasuryTab;
+        treasuryMinus100Button.active = treasuryTab;
+        treasuryMinus10Button.active = treasuryTab;
+        treasuryMinus1Button.active = treasuryTab && menu.getTreasuryActionAmount() > 1L;
+        treasuryPlus1Button.active = treasuryTab;
+        treasuryPlus10Button.active = treasuryTab;
+        treasuryPlus100Button.active = treasuryTab;
+        treasuryPlus1000Button.active = treasuryTab;
+        treasuryDepositButton.active = treasuryTab && menu.canDepositTreasury();
+        treasuryWithdrawButton.active = treasuryTab && menu.canWithdrawTreasury();
+        treasuryDepositAllButton.active = treasuryTab && menu.canDepositTreasury();
     }
 
     @Override
@@ -327,6 +514,8 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
             renderOverview(graphics);
         } else if (tab == SettlementMenuTab.WAR) {
             renderWar(graphics);
+        } else if (tab == SettlementMenuTab.TREASURY) {
+            renderTreasury(graphics);
         } else if (tab == SettlementMenuTab.RECONSTRUCTION) {
             renderReconstruction(graphics);
         }
@@ -342,17 +531,7 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         y += 12;
         graphics.drawString(this.font, "Клеймов: " + menu.getClaimedChunkCount(), x, y, 0xFFFFFF, false);
         y += 12;
-        graphics.drawString(this.font, "Лимит покупки: " + menu.getPurchasedChunkAllowance(), x, y, 0xFFFFFF, false);
-        y += 12;
-
-        graphics.drawString(
-                this.font,
-                menu.canViewTreasuryBalance() ? "Баланс казны: " + menu.getTreasuryBalance() : "Баланс казны: скрыт",
-                x,
-                y,
-                0xA8FFA8,
-                false
-        );
+        graphics.drawString(this.font, "Лимит по жителям: " + menu.getClaimLimitByResidents(), x, y, 0xFFFFFF, false);
         y += 12;
 
         graphics.drawString(
@@ -377,6 +556,17 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         y += 12;
 
         graphics.drawString(this.font, "Реконструкция: " + (menu.hasActiveReconstruction() ? "активна" : "нет"), x, y, 0xE0E0E0, false);
+
+        int debtX = 140;
+        int debtY = 60;
+
+        graphics.drawString(this.font, "Личный долг", debtX, debtY, 0xFFFFFF, false);
+        debtY += 12;
+        graphics.drawString(this.font, "Долг: " + menu.getPlayerDebt(), debtX, debtY, 0xFFD8A8, false);
+        debtY += 12;
+        graphics.drawString(this.font, "Сумма оплаты: " + menu.getPersonalDebtActionAmount(), debtX, debtY, 0xFFFFFF, false);
+        debtY += 12;
+        graphics.drawString(this.font, "Оплата идет в казну поселения", debtX, debtY, 0xC8C8C8, false);
     }
 
     private void renderWar(GuiGraphics graphics) {
@@ -399,6 +589,46 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
             graphics.drawString(this.font, shorten(war.getDetail(), 48), 18, y, 0xE0E0E0, false);
             y += 16;
         }
+    }
+
+    private void renderTreasury(GuiGraphics graphics) {
+        int x = 10;
+        int y = 60;
+
+        graphics.drawString(this.font, "Казна поселения", x, y, 0xFFFFFF, false);
+        y += 12;
+        graphics.drawString(
+                this.font,
+                menu.canViewTreasuryBalance() ? "Баланс: " + menu.getTreasuryBalance() : "Баланс: скрыт",
+                x,
+                y,
+                menu.canViewTreasuryBalance() ? 0xA8FFA8 : 0xE0E0E0,
+                false
+        );
+        y += 12;
+        graphics.drawString(
+                this.font,
+                menu.canViewSettlementDebt() ? "Долг поселения: " + menu.getSettlementDebt() : "Долг поселения: скрыт",
+                x,
+                y,
+                0xFFB0B0,
+                false
+        );
+        y += 12;
+        graphics.drawString(this.font, menu.canDepositTreasury() ? "Пополнение: доступно" : "Пополнение: недоступно", x, y, menu.canDepositTreasury() ? 0xA8FFA8 : 0xFFB0B0, false);
+        y += 12;
+        graphics.drawString(this.font, menu.canWithdrawTreasury() ? "Вывод: доступен" : "Вывод: недоступен", x, y, menu.canWithdrawTreasury() ? 0xA8FFA8 : 0xFFB0B0, false);
+        y += 12;
+
+        int treasuryX = 140;
+        int treasuryY = 60;
+
+        graphics.drawString(this.font, "Операция с казной", treasuryX, treasuryY, 0xFFFFFF, false);
+        treasuryY += 12;
+        graphics.drawString(this.font, "Сумма: " + menu.getTreasuryActionAmount(), treasuryX, treasuryY, 0xFFFFFF, false);
+        treasuryY += 12;
+        graphics.drawString(this.font, menu.canDepositTreasury() ? "Внести: да" : "Внести: нет", treasuryX, treasuryY, menu.canDepositTreasury() ? 0xA8FFA8 : 0xFFB0B0, false);
+        graphics.drawString(this.font, menu.canWithdrawTreasury() ? "Вывести: да" : "Вывести: нет", treasuryX + 92, treasuryY, menu.canWithdrawTreasury() ? 0xA8FFA8 : 0xFFB0B0, false);
     }
 
     private void renderReconstruction(GuiGraphics graphics) {

@@ -5,7 +5,6 @@ import com.settlements.data.model.Settlement;
 import com.settlements.data.model.SettlementChunkClaim;
 import com.settlements.data.model.SettlementMember;
 import com.settlements.data.model.SettlementPermission;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
@@ -32,13 +31,43 @@ public final class ClaimService {
             throw new IllegalStateException("Этот чанк уже занят.");
         }
 
-        int memberBasedLimit = settlement.getMembers().size() * 9;
+        int memberBasedLimit = settlement.getClaimLimitByResidents();
         if (settlement.getClaimedChunkCount() >= memberBasedLimit) {
             throw new IllegalStateException("Превышен лимит чанков по числу жителей.");
         }
 
-        if (settlement.getClaimedChunkCount() >= settlement.getPurchasedChunkAllowance()) {
-            throw new IllegalStateException("Недостаточно купленного лимита чанков.");
+
+        if (settlement.getClaimedChunkCount() > 0 && !hasAdjacentOwnedChunk(data, settlement, player.level(), chunkPos)) {
+            throw new IllegalStateException("Новый чанк должен соседствовать с уже принадлежащим поселению.");
+        }
+
+        SettlementChunkClaim claim = new SettlementChunkClaim(
+                settlement.getId(),
+                player.level().dimension().location(),
+                chunkPos.x,
+                chunkPos.z
+        );
+
+        data.addClaim(claim, player.level().getGameTime());
+    }
+
+    public static void claimCurrentChunkForSettlement(ServerPlayer player, java.util.UUID settlementId) {
+        SettlementSavedData data = SettlementSavedData.get(player.server);
+        Settlement settlement = data.getSettlement(settlementId);
+
+        if (settlement == null) {
+            throw new IllegalArgumentException("Поселение не найдено.");
+        }
+
+        ChunkPos chunkPos = new ChunkPos(player.blockPosition());
+
+        if (data.isChunkClaimed(player.level(), chunkPos)) {
+            throw new IllegalStateException("Этот чанк уже занят.");
+        }
+
+        int memberBasedLimit = settlement.getClaimLimitByResidents();
+        if (settlement.getClaimedChunkCount() >= memberBasedLimit) {
+            throw new IllegalStateException("Превышен лимит чанков по числу жителей.");
         }
 
         if (settlement.getClaimedChunkCount() > 0 && !hasAdjacentOwnedChunk(data, settlement, player.level(), chunkPos)) {
@@ -53,6 +82,18 @@ public final class ClaimService {
         );
 
         data.addClaim(claim, player.level().getGameTime());
+    }
+
+    public static void adminUnclaimCurrentChunk(ServerPlayer player) {
+        SettlementSavedData data = SettlementSavedData.get(player.server);
+        ChunkPos chunkPos = new ChunkPos(player.blockPosition());
+        SettlementChunkClaim claim = data.getClaim(player.level(), chunkPos);
+
+        if (claim == null) {
+            throw new IllegalStateException("Этот чанк не клеймлен.");
+        }
+
+        data.removeClaim(player.level().dimension(), chunkPos, player.level().getGameTime());
     }
 
     public static void unclaimCurrentChunk(ServerPlayer player) {

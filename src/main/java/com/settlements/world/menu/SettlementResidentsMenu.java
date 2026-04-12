@@ -76,7 +76,7 @@ public class SettlementResidentsMenu extends AbstractContainerMenu {
             return;
         }
 
-        if (!canOpenResidentsMenu(settlement, self, serverPlayer.getUUID())) {
+        if (!serverPlayer.hasPermissions(2) && !canOpenResidentsMenu(settlement, self, serverPlayer.getUUID())) {
             serverPlayer.displayClientMessage(Component.literal("Нет права открывать список жителей."), true);
             return;
         }
@@ -160,7 +160,9 @@ public class SettlementResidentsMenu extends AbstractContainerMenu {
                     return page;
                 }
                 if (index == DATA_CAN_OPEN) {
-                    return canOpenResidentsMenu(settlement, self, playerInventory.player.getUUID()) ? 1 : 0;
+                    boolean isAdmin = playerInventory.player instanceof ServerPlayer
+                            && ((ServerPlayer) playerInventory.player).hasPermissions(2);
+                    return (isAdmin || canOpenResidentsMenu(settlement, self, playerInventory.player.getUUID())) ? 1 : 0;
                 }
                 return 0;
             }
@@ -255,11 +257,7 @@ public class SettlementResidentsMenu extends AbstractContainerMenu {
     }
 
     private static boolean canOpenResidentsMenu(Settlement settlement, SettlementMember self, UUID actorUuid) {
-        return hasPermission(settlement, self, actorUuid, SettlementPermission.VIEW_RESIDENTS)
-                || hasPermission(settlement, self, actorUuid, SettlementPermission.GRANT_PERMISSIONS)
-                || hasPermission(settlement, self, actorUuid, SettlementPermission.CHANGE_PLAYER_TAX)
-                || hasPermission(settlement, self, actorUuid, SettlementPermission.CHANGE_PLAYER_SHOP_TAX)
-                || hasPermission(settlement, self, actorUuid, SettlementPermission.VIEW_RESIDENT_PERMISSIONS);
+        return settlement != null && actorUuid != null && settlement.isResident(actorUuid);
     }
 
     private static int getMaxPage(int size, int pageSize) {

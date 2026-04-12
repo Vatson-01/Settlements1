@@ -25,7 +25,7 @@ public final class PlotService {
             throw new IllegalStateException("Игрок не состоит в поселении.");
         }
 
-        if (!canAssignPlots(settlement, actor)) {
+        if (!canAssignPersonalPlots(settlement, actor)) {
             throw new IllegalStateException("Нет права на назначение личных участков.");
         }
 
@@ -75,8 +75,8 @@ public final class PlotService {
             throw new IllegalStateException("Игрок не состоит в поселении.");
         }
 
-        if (!canAssignPlots(settlement, actor)) {
-            throw new IllegalStateException("Нет права на управление участками.");
+        if (!canAssignPublicPlots(settlement, actor)) {
+            throw new IllegalStateException("Нет права на перевод участков в общую территорию.");
         }
 
         ChunkPos chunkPos = new ChunkPos(actor.blockPosition());
@@ -132,20 +132,28 @@ public final class PlotService {
             throw new IllegalStateException("Этот участок принадлежит другому поселению.");
         }
 
-        if (settlement.isLeader(actor.getUUID()) || plot.isOwner(actor.getUUID())) {
+        if (settlement.isLeader(actor.getUUID()) || plot.isOwner(actor.getUUID()) || hasSettlementPermission(settlement, actor, SettlementPermission.ASSIGN_PERSONAL_PLOTS)) {
             return plot;
         }
 
-        throw new IllegalStateException("Редактировать доступ участка может только владелец участка или глава.");
+        throw new IllegalStateException("Редактировать доступ участка может владелец, глава или житель с правом ASSIGN_PERSONAL_PLOTS.");
     }
 
-    private static boolean canAssignPlots(Settlement settlement, ServerPlayer actor) {
+    private static boolean canAssignPersonalPlots(Settlement settlement, ServerPlayer actor) {
+        return hasSettlementPermission(settlement, actor, SettlementPermission.ASSIGN_PERSONAL_PLOTS);
+    }
+
+    private static boolean canAssignPublicPlots(Settlement settlement, ServerPlayer actor) {
+        return hasSettlementPermission(settlement, actor, SettlementPermission.ASSIGN_PUBLIC_PLOTS);
+    }
+
+    private static boolean hasSettlementPermission(Settlement settlement, ServerPlayer actor, SettlementPermission permission) {
         if (settlement.isLeader(actor.getUUID())) {
             return true;
         }
 
         SettlementMember member = settlement.getMember(actor.getUUID());
-        return member != null && member.getPermissionSet().has(SettlementPermission.ASSIGN_PERSONAL_PLOTS);
+        return member != null && member.getPermissionSet().has(permission);
     }
 
     public static void transferPlotsToLeaderOnMemberLeave(SettlementSavedData data, UUID settlementId, UUID oldOwnerUuid, UUID leaderUuid, long gameTime) {

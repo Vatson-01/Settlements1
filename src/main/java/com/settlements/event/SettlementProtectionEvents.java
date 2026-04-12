@@ -92,6 +92,10 @@ public final class SettlementProtectionEvents {
             return;
         }
 
+        if (isPublicAccess(player, event.getPos(), action)) {
+            return;
+        }
+
         if (PermissionService.canPerform(player, event.getPos(), action)) {
             return;
         }
@@ -103,6 +107,24 @@ public final class SettlementProtectionEvents {
         event.setCanceled(true);
         event.setCancellationResult(InteractionResult.FAIL);
         player.displayClientMessage(Component.literal("У тебя нет доступа к этому участку."), true);
+    }
+
+    private static boolean isPublicAccess(ServerPlayer player, BlockPos pos, ProtectedAction action) {
+        SettlementSavedData data = SettlementSavedData.get(player.server);
+
+        if (action == ProtectedAction.OPEN_DOOR) {
+            return data.isPublicDoor(player.level(), pos);
+        }
+
+        if (action == ProtectedAction.USE_REDSTONE) {
+            return data.isPublicDoorControl(player.level(), pos);
+        }
+
+        if (action == ProtectedAction.OPEN_CONTAINER) {
+            return data.isPublicContainer(player.level(), pos);
+        }
+
+        return false;
     }
 
     private static boolean canUseSiegeOverride(ServerPlayer player, BlockPos pos, ProtectedAction action) {

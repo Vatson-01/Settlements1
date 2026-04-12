@@ -125,14 +125,24 @@ public final class TaxService {
             throw new IllegalStateException("Игрок не найден в поселении.");
         }
 
-        long actualAmount = Math.min(member.getPersonalTaxDebt(), requestedAmount);
-        if (actualAmount <= 0L) {
+        long debt = member.getPersonalTaxDebt();
+        if (debt <= 0L) {
             throw new IllegalStateException("У игрока нет долга.");
+        }
+
+        long availableMoney = CurrencyService.countPlayerCurrency(player);
+        if (availableMoney <= 0L) {
+            throw new IllegalStateException("У игрока нет монет для оплаты долга.");
+        }
+
+        long actualAmount = Math.min(debt, Math.min(requestedAmount, availableMoney));
+        if (actualAmount <= 0L) {
+            throw new IllegalStateException("Не удалось определить сумму для оплаты долга.");
         }
 
         boolean removed = CurrencyService.removeCurrencyAmountFromPlayer(player, actualAmount);
         if (!removed) {
-            throw new IllegalStateException("У игрока недостаточно монет для оплаты долга.");
+            throw new IllegalStateException("Не удалось списать монеты для оплаты долга.");
         }
 
         long paid = member.reducePersonalTaxDebt(actualAmount);

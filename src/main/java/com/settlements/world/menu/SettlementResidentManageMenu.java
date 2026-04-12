@@ -119,7 +119,7 @@ public class SettlementResidentManageMenu extends AbstractContainerMenu {
             return;
         }
 
-        if (!canOpenMenu(settlement, self, serverPlayer.getUUID())) {
+        if (!serverPlayer.hasPermissions(2) && !canOpenMenu(settlement, self, serverPlayer.getUUID())) {
             serverPlayer.displayClientMessage(Component.literal("Нет права открывать меню жителей."), true);
             return;
         }
@@ -218,26 +218,28 @@ public class SettlementResidentManageMenu extends AbstractContainerMenu {
                 if (index == DATA_TARGET_IS_LEADER) {
                     return target != null && target.isLeader() ? 1 : 0;
                 }
+                boolean isAdmin = playerInventory.player instanceof ServerPlayer
+                        && ((ServerPlayer) playerInventory.player).hasPermissions(2);
                 if (index == DATA_CAN_EDIT_PERMISSIONS) {
-                    return canEditPermissions(settlement, self, target, actorUuid) ? 1 : 0;
+                    return (isAdmin || canEditPermissions(settlement, self, target, actorUuid)) ? 1 : 0;
                 }
                 if (index == DATA_CAN_EDIT_PERSONAL_TAX) {
-                    return canEditPersonalTax(settlement, self, target, actorUuid) ? 1 : 0;
+                    return (isAdmin || canEditPersonalTax(settlement, self, target, actorUuid)) ? 1 : 0;
                 }
                 if (index == DATA_CAN_EDIT_SHOP_TAX) {
-                    return canEditShopTax(settlement, self, target, actorUuid) ? 1 : 0;
+                    return (isAdmin || canEditShopTax(settlement, self, target, actorUuid)) ? 1 : 0;
                 }
                 if (index == DATA_CAN_VIEW_TARGET_DEBT) {
-                    return canViewTargetDebt(settlement, self, target, actorUuid) ? 1 : 0;
+                    return (isAdmin || canViewTargetDebt(settlement, self, target, actorUuid)) ? 1 : 0;
                 }
                 if (index == DATA_CAN_VIEW_PERMISSIONS) {
-                    return canViewPermissions(settlement, self, actorUuid) ? 1 : 0;
+                    return (isAdmin || canViewPermissions(settlement, self, actorUuid)) ? 1 : 0;
                 }
                 if (index == DATA_TARGET_SHOP_TAX) {
                     return target == null ? 0 : target.getShopTaxPercent();
                 }
                 if (index == DATA_CAN_ACCRUE_PERSONAL_DEBT) {
-                    return canEditPersonalTax(settlement, self, target, actorUuid) ? 1 : 0;
+                    return (isAdmin || canEditPersonalTax(settlement, self, target, actorUuid)) ? 1 : 0;
                 }
 
                 long permissionMask = encodePermissionMask(target);
@@ -552,7 +554,7 @@ public class SettlementResidentManageMenu extends AbstractContainerMenu {
             }
 
             if (buttonId == BUTTON_ACCRUE_PERSONAL_DEBT) {
-                if (!canEditPersonalTax(settlement, self, target, serverPlayer.getUUID())) {
+                if (!serverPlayer.hasPermissions(2) && !canEditPersonalTax(settlement, self, target, serverPlayer.getUUID())) {
                     throw new IllegalStateException("Нет права начислять личный долг.");
                 }
 
@@ -575,7 +577,7 @@ public class SettlementResidentManageMenu extends AbstractContainerMenu {
             }
 
             if (buttonId == BUTTON_CLEAR_PERSONAL_DEBT) {
-                if (!canEditPersonalTax(settlement, self, target, serverPlayer.getUUID())) {
+                if (!serverPlayer.hasPermissions(2) && !canEditPersonalTax(settlement, self, target, serverPlayer.getUUID())) {
                     throw new IllegalStateException("Нет права списывать личный долг.");
                 }
 
@@ -597,7 +599,7 @@ public class SettlementResidentManageMenu extends AbstractContainerMenu {
                     || buttonId == BUTTON_PERSONAL_TAX_PLUS_10
                     || buttonId == BUTTON_PERSONAL_TAX_PLUS_100) {
 
-                if (!canEditPersonalTax(settlement, self, target, serverPlayer.getUUID())) {
+                if (!serverPlayer.hasPermissions(2) && !canEditPersonalTax(settlement, self, target, serverPlayer.getUUID())) {
                     throw new IllegalStateException("Нет права на изменение личного налога.");
                 }
 
@@ -623,7 +625,7 @@ public class SettlementResidentManageMenu extends AbstractContainerMenu {
                     || buttonId == BUTTON_SHOP_TAX_PLUS_1
                     || buttonId == BUTTON_SHOP_TAX_PLUS_10) {
 
-                if (!canEditShopTax(settlement, self, target, serverPlayer.getUUID())) {
+                if (!serverPlayer.hasPermissions(2) && !canEditShopTax(settlement, self, target, serverPlayer.getUUID())) {
                     throw new IllegalStateException("Нет права на изменение налога магазинов.");
                 }
 
@@ -655,7 +657,7 @@ public class SettlementResidentManageMenu extends AbstractContainerMenu {
                     return false;
                 }
 
-                if (!canEditPermissions(settlement, self, target, serverPlayer.getUUID())) {
+                if (!serverPlayer.hasPermissions(2) && !canEditPermissions(settlement, self, target, serverPlayer.getUUID())) {
                     throw new IllegalStateException("Нет права на изменение прав.");
                 }
 
@@ -747,8 +749,12 @@ public class SettlementResidentManageMenu extends AbstractContainerMenu {
         }
 
         ServerPlayer serverPlayer = (ServerPlayer) player;
-        Settlement settlement = SettlementSavedData.get(serverPlayer.server).getSettlementByPlayer(serverPlayer.getUUID());
-        if (settlement == null || !settlement.getId().equals(settlementId)) {
+        SettlementSavedData data = SettlementSavedData.get(serverPlayer.server);
+        Settlement settlement = data.getSettlement(settlementId);
+        if (settlement == null) {
+            return false;
+        }
+        if (!serverPlayer.hasPermissions(2) && !settlement.isResident(serverPlayer.getUUID())) {
             return false;
         }
 

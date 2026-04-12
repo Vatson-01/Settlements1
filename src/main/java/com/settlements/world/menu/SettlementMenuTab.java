@@ -3,7 +3,8 @@ package com.settlements.world.menu;
 public enum SettlementMenuTab {
     OVERVIEW(0, "Обзор"),
     WAR(1, "Война"),
-    RECONSTRUCTION(2, "Реконструкция");
+    TREASURY(2, "Казна"),
+    RECONSTRUCTION(3, "Реконструкция");
 
     private final int index;
     private final String title;

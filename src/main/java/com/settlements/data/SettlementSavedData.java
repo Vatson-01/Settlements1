@@ -12,6 +12,7 @@ import com.settlements.data.model.WarRecord;
 import com.settlements.util.BlockPosKeyUtil;
 import com.settlements.util.ClaimKeyUtil;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
@@ -19,6 +20,11 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.ChestBlock;
+import net.minecraft.world.level.block.DoorBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.ChestType;
+import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.saveddata.SavedData;
 
 import java.util.ArrayList;
@@ -61,6 +67,9 @@ public class SettlementSavedData extends SavedData {
     private final Map<UUID, UUID> activeReconstructionIdBySettlementId = new LinkedHashMap<UUID, UUID>();
 
     private final Set<UUID> globalPlotAccessPlayerUuids = new LinkedHashSet<UUID>();
+    private final Set<String> publicDoorKeys = new LinkedHashSet<String>();
+    private final Set<String> publicDoorControlKeys = new LinkedHashSet<String>();
+    private final Set<String> publicContainerKeys = new LinkedHashSet<String>();
 
     public SettlementSavedData() {
     }
@@ -166,6 +175,36 @@ public class SettlementSavedData extends SavedData {
             }
         }
 
+        if (tag.contains("PublicDoorKeys", Tag.TAG_LIST)) {
+            ListTag publicDoorList = tag.getList("PublicDoorKeys", Tag.TAG_STRING);
+            for (int i = 0; i < publicDoorList.size(); i++) {
+                String key = publicDoorList.getString(i);
+                if (!key.isEmpty()) {
+                    data.publicDoorKeys.add(key);
+                }
+            }
+        }
+
+        if (tag.contains("PublicDoorControlKeys", Tag.TAG_LIST)) {
+            ListTag publicDoorControlList = tag.getList("PublicDoorControlKeys", Tag.TAG_STRING);
+            for (int i = 0; i < publicDoorControlList.size(); i++) {
+                String key = publicDoorControlList.getString(i);
+                if (!key.isEmpty()) {
+                    data.publicDoorControlKeys.add(key);
+                }
+            }
+        }
+
+        if (tag.contains("PublicContainerKeys", Tag.TAG_LIST)) {
+            ListTag publicContainerList = tag.getList("PublicContainerKeys", Tag.TAG_STRING);
+            for (int i = 0; i < publicContainerList.size(); i++) {
+                String key = publicContainerList.getString(i);
+                if (!key.isEmpty()) {
+                    data.publicContainerKeys.add(key);
+                }
+            }
+        }
+
         data.rebuildIndexes();
         return data;
     }
@@ -231,6 +270,24 @@ public class SettlementSavedData extends SavedData {
             globalPlotAccessTag.add(StringTag.valueOf(playerUuid.toString()));
         }
         tag.put("GlobalPlotAccessPlayers", globalPlotAccessTag);
+
+        ListTag publicDoorTag = new ListTag();
+        for (String key : publicDoorKeys) {
+            publicDoorTag.add(StringTag.valueOf(key));
+        }
+        tag.put("PublicDoorKeys", publicDoorTag);
+
+        ListTag publicDoorControlTag = new ListTag();
+        for (String key : publicDoorControlKeys) {
+            publicDoorControlTag.add(StringTag.valueOf(key));
+        }
+        tag.put("PublicDoorControlKeys", publicDoorControlTag);
+
+        ListTag publicContainerTag = new ListTag();
+        for (String key : publicContainerKeys) {
+            publicContainerTag.add(StringTag.valueOf(key));
+        }
+        tag.put("PublicContainerKeys", publicContainerTag);
 
         return tag;
     }
@@ -334,6 +391,248 @@ public class SettlementSavedData extends SavedData {
 
     public Collection<UUID> getGlobalPlotAccessPlayers() {
         return Collections.unmodifiableSet(globalPlotAccessPlayerUuids);
+    }
+
+    public boolean isPublicDoor(Level level, BlockPos pos) {
+        return isPublicKey(publicDoorKeys, level, pos, resolveDoorObjectPositions(level, pos));
+    }
+
+    public void setPublicDoor(Level level, BlockPos pos, boolean enabled) {
+        setPublicKeys(publicDoorKeys, level, pos, resolveDoorObjectPositions(level, pos), enabled);
+    }
+
+    public boolean isPublicDoorControl(Level level, BlockPos pos) {
+        return publicDoorControlKeys.contains(BlockPosKeyUtil.toKey(level.dimension(), pos));
+    }
+
+    public void setPublicDoorControl(Level level, BlockPos pos, boolean enabled) {
+        setPublicKeys(publicDoorControlKeys, level, pos, Collections.singletonList(pos), enabled);
+    }
+
+    public boolean isPublicContainer(Level level, BlockPos pos) {
+        return isPublicKey(publicContainerKeys, level, pos, resolveContainerObjectPositions(level, pos));
+    }
+
+    public void setPublicContainer(Level level, BlockPos pos, boolean enabled) {
+        setPublicKeys(publicContainerKeys, level, pos, resolveContainerObjectPositions(level, pos), enabled);
+    }
+
+    public Collection<String> getPublicDoorKeys() {
+        return Collections.unmodifiableSet(publicDoorKeys);
+    }
+
+    public Collection<String> getPublicDoorControlKeys() {
+        return Collections.unmodifiableSet(publicDoorControlKeys);
+    }
+
+    public Collection<String> getPublicContainerKeys() {
+        return Collections.unmodifiableSet(publicContainerKeys);
+    }
+
+    public int clearPublicDoorsInChunk(Level level, ChunkPos chunkPos) {
+        return clearPublicKeysInChunk(publicDoorKeys, level, chunkPos);
+    }
+
+    public int clearPublicDoorControlsInChunk(Level level, ChunkPos chunkPos) {
+        return clearPublicKeysInChunk(publicDoorControlKeys, level, chunkPos);
+    }
+
+    public int clearPublicContainersInChunk(Level level, ChunkPos chunkPos) {
+        return clearPublicKeysInChunk(publicContainerKeys, level, chunkPos);
+    }
+
+    public int clearPublicDoorsForSettlement(Settlement settlement) {
+        return clearPublicKeysForSettlement(publicDoorKeys, settlement);
+    }
+
+    public int clearPublicDoorControlsForSettlement(Settlement settlement) {
+        return clearPublicKeysForSettlement(publicDoorControlKeys, settlement);
+    }
+
+    public int clearPublicContainersForSettlement(Settlement settlement) {
+        return clearPublicKeysForSettlement(publicContainerKeys, settlement);
+    }
+
+    public int clearAllPublicDoors() {
+        return clearAllPublicKeys(publicDoorKeys);
+    }
+
+    public int clearAllPublicDoorControls() {
+        return clearAllPublicKeys(publicDoorControlKeys);
+    }
+
+    public int clearAllPublicContainers() {
+        return clearAllPublicKeys(publicContainerKeys);
+    }
+
+
+    private boolean isPublicKey(Set<String> targetSet, Level level, BlockPos pos, Collection<BlockPos> objectPositions) {
+        if (targetSet.contains(BlockPosKeyUtil.toKey(level.dimension(), pos))) {
+            return true;
+        }
+
+        for (BlockPos objectPos : objectPositions) {
+            if (targetSet.contains(BlockPosKeyUtil.toKey(level.dimension(), objectPos))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void setPublicKeys(Set<String> targetSet, Level level, BlockPos pos, Collection<BlockPos> objectPositions, boolean enabled) {
+        if (objectPositions == null || objectPositions.isEmpty()) {
+            objectPositions = Collections.singletonList(pos);
+        }
+
+        for (BlockPos objectPos : objectPositions) {
+            String key = BlockPosKeyUtil.toKey(level.dimension(), objectPos);
+            if (enabled) {
+                targetSet.add(key);
+            } else {
+                targetSet.remove(key);
+            }
+        }
+        setDirty();
+    }
+    private int clearPublicKeysInChunk(Set<String> targetSet, Level level, ChunkPos chunkPos) {
+        if (targetSet.isEmpty()) {
+            return 0;
+        }
+
+        String dimensionId = level.dimension().location().toString();
+        int removed = 0;
+
+        java.util.Iterator<String> iterator = targetSet.iterator();
+        while (iterator.hasNext()) {
+            String key = iterator.next();
+            ParsedBlockPosKey parsed = parseBlockPosKey(key);
+            if (parsed == null) {
+                continue;
+            }
+
+            if (!dimensionId.equals(parsed.dimensionId)) {
+                continue;
+            }
+
+            ChunkPos keyChunk = new ChunkPos(new BlockPos(parsed.x, parsed.y, parsed.z));
+            if (keyChunk.x == chunkPos.x && keyChunk.z == chunkPos.z) {
+                iterator.remove();
+                removed++;
+            }
+        }
+
+        if (removed > 0) {
+            setDirty();
+        }
+
+        return removed;
+    }
+
+    private int clearPublicKeysForSettlement(Set<String> targetSet, Settlement settlement) {
+        if (targetSet.isEmpty() || settlement == null) {
+            return 0;
+        }
+
+        Set<String> claimedChunkKeys = new LinkedHashSet<String>(settlement.getClaimedChunkKeys());
+        if (claimedChunkKeys.isEmpty()) {
+            return 0;
+        }
+
+        int removed = 0;
+        java.util.Iterator<String> iterator = targetSet.iterator();
+        while (iterator.hasNext()) {
+            String key = iterator.next();
+            ParsedBlockPosKey parsed = parseBlockPosKey(key);
+            if (parsed == null) {
+                continue;
+            }
+
+            String chunkKey = parsed.dimensionId + "|" + (parsed.x >> 4) + "|" + (parsed.z >> 4);
+            if (claimedChunkKeys.contains(chunkKey)) {
+                iterator.remove();
+                removed++;
+            }
+        }
+
+        if (removed > 0) {
+            setDirty();
+        }
+
+        return removed;
+    }
+
+    private int clearAllPublicKeys(Set<String> targetSet) {
+        int removed = targetSet.size();
+        if (removed > 0) {
+            targetSet.clear();
+            setDirty();
+        }
+        return removed;
+    }
+
+    private ParsedBlockPosKey parseBlockPosKey(String key) {
+        if (key == null || key.isEmpty()) {
+            return null;
+        }
+
+        String[] parts = key.split("\\|");
+        if (parts.length != 4) {
+            return null;
+        }
+
+        try {
+            String dimensionId = parts[0];
+            int x = Integer.parseInt(parts[1]);
+            int y = Integer.parseInt(parts[2]);
+            int z = Integer.parseInt(parts[3]);
+            return new ParsedBlockPosKey(dimensionId, x, y, z);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private static final class ParsedBlockPosKey {
+        private final String dimensionId;
+        private final int x;
+        private final int y;
+        private final int z;
+
+        private ParsedBlockPosKey(String dimensionId, int x, int y, int z) {
+            this.dimensionId = dimensionId;
+            this.x = x;
+            this.y = y;
+            this.z = z;
+        }
+    }
+    private Collection<BlockPos> resolveDoorObjectPositions(Level level, BlockPos pos) {
+        Set<BlockPos> result = new LinkedHashSet<BlockPos>();
+        result.add(pos.immutable());
+
+        BlockState state = level.getBlockState(pos);
+        if (state.getBlock() instanceof DoorBlock) {
+            DoubleBlockHalf half = state.getValue(DoorBlock.HALF);
+            BlockPos otherPos = half == DoubleBlockHalf.LOWER ? pos.above() : pos.below();
+            result.add(otherPos.immutable());
+        }
+
+        return result;
+    }
+
+    private Collection<BlockPos> resolveContainerObjectPositions(Level level, BlockPos pos) {
+        Set<BlockPos> result = new LinkedHashSet<BlockPos>();
+        result.add(pos.immutable());
+
+        BlockState state = level.getBlockState(pos);
+        if (state.getBlock() instanceof ChestBlock) {
+            ChestType chestType = state.getValue(ChestBlock.TYPE);
+            if (chestType != ChestType.SINGLE) {
+                Direction connectedDirection = ChestBlock.getConnectedDirection(state);
+                result.add(pos.relative(connectedDirection).immutable());
+            }
+        }
+
+        return result;
     }
 
     public ShopRecord getShop(UUID shopId) {

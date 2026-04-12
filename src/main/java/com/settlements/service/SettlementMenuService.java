@@ -19,6 +19,20 @@ public final class SettlementMenuService {
             throw new IllegalStateException("Ты не состоишь в поселении.");
         }
 
+        openMenu(player, settlement.getId());
+    }
+
+    public static void openMenu(ServerPlayer player, java.util.UUID settlementId) {
+        SettlementSavedData data = SettlementSavedData.get(player.server);
+        Settlement settlement = data.getSettlement(settlementId);
+        if (settlement == null) {
+            throw new IllegalStateException("Поселение не найдено.");
+        }
+
+        if (!player.hasPermissions(2) && !settlement.isResident(player.getUUID())) {
+            throw new IllegalStateException("Ты не состоишь в этом поселении.");
+        }
+
         NetworkHooks.openScreen(
                 player,
                 new SimpleMenuProvider(

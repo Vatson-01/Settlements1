@@ -11,6 +11,8 @@ import com.settlements.data.model.WarRecord;
 import com.settlements.registry.ModMenuTypes;
 import com.settlements.service.ReconstructionRestoreResult;
 import com.settlements.service.ReconstructionService;
+import com.settlements.service.TaxService;
+import com.settlements.service.TreasuryService;
 import com.mojang.authlib.GameProfile;
 import net.minecraft.server.players.GameProfileCache;
 import java.util.Optional;
@@ -37,12 +39,37 @@ public class SettlementMenu extends AbstractContainerMenu {
 
     public static final int BUTTON_TAB_OVERVIEW = 0;
     public static final int BUTTON_TAB_WAR = 1;
-    public static final int BUTTON_TAB_RECONSTRUCTION = 2;
+    public static final int BUTTON_TAB_TREASURY = 2;
+    public static final int BUTTON_TAB_RECONSTRUCTION = 3;
     public static final int BUTTON_PAGE_PREV = 10;
     public static final int BUTTON_PAGE_NEXT = 11;
     public static final int BUTTON_OPEN_RECONSTRUCTION_STORAGE = 12;
     public static final int BUTTON_RESTORE_RECONSTRUCTION = 13;
     public static final int BUTTON_STOP_RECONSTRUCTION = 14;
+
+    public static final int BUTTON_TREASURY_AMOUNT_MINUS_1000 = 100;
+    public static final int BUTTON_TREASURY_AMOUNT_MINUS_100 = 101;
+    public static final int BUTTON_TREASURY_AMOUNT_MINUS_10 = 102;
+    public static final int BUTTON_TREASURY_AMOUNT_MINUS_1 = 103;
+    public static final int BUTTON_TREASURY_AMOUNT_PLUS_1 = 104;
+    public static final int BUTTON_TREASURY_AMOUNT_PLUS_10 = 105;
+    public static final int BUTTON_TREASURY_AMOUNT_PLUS_100 = 106;
+    public static final int BUTTON_TREASURY_AMOUNT_PLUS_1000 = 107;
+    public static final int BUTTON_TREASURY_DEPOSIT_SELECTED = 108;
+    public static final int BUTTON_TREASURY_WITHDRAW_SELECTED = 109;
+    public static final int BUTTON_TREASURY_DEPOSIT_ALL = 110;
+
+    public static final int BUTTON_PERSONAL_DEBT_AMOUNT_MINUS_1000 = 120;
+    public static final int BUTTON_PERSONAL_DEBT_AMOUNT_MINUS_100 = 121;
+    public static final int BUTTON_PERSONAL_DEBT_AMOUNT_MINUS_10 = 122;
+    public static final int BUTTON_PERSONAL_DEBT_AMOUNT_MINUS_1 = 123;
+    public static final int BUTTON_PERSONAL_DEBT_AMOUNT_PLUS_1 = 124;
+    public static final int BUTTON_PERSONAL_DEBT_AMOUNT_PLUS_10 = 125;
+    public static final int BUTTON_PERSONAL_DEBT_AMOUNT_PLUS_100 = 126;
+    public static final int BUTTON_PERSONAL_DEBT_AMOUNT_PLUS_1000 = 127;
+    public static final int BUTTON_PERSONAL_DEBT_PAY_SELECTED = 118;
+    public static final int BUTTON_PERSONAL_DEBT_PAY_ALL = 119;
+
     public static final int BUTTON_SKIP_RECON_ENTRY_BASE = 40000;
 
     private static final int DATA_SELECTED_TAB = 0;
@@ -72,7 +99,13 @@ public class SettlementMenu extends AbstractContainerMenu {
     private static final int DATA_CAN_VIEW_TREASURY = 24;
     private static final int DATA_CAN_VIEW_SETTLEMENT_DEBT = 25;
     private static final int DATA_CAN_VIEW_WARS = 26;
-    private static final int DATA_COUNT = 27;
+    private static final int DATA_TREASURY_ACTION_AMOUNT_WORD_0 = 27;
+    private static final int DATA_TREASURY_ACTION_AMOUNT_WORD_1 = 28;
+    private static final int DATA_CAN_DEPOSIT_TREASURY = 29;
+    private static final int DATA_CAN_WITHDRAW_TREASURY = 30;
+    private static final int DATA_PERSONAL_DEBT_ACTION_AMOUNT_WORD_0 = 31;
+    private static final int DATA_PERSONAL_DEBT_ACTION_AMOUNT_WORD_1 = 32;
+    private static final int DATA_COUNT = 33;
 
     private final UUID settlementId;
     private final String settlementName;
@@ -104,7 +137,9 @@ public class SettlementMenu extends AbstractContainerMenu {
                         openData,
                         SettlementMenuTab.OVERVIEW.getIndex(),
                         0,
-                        0
+                        0,
+                        100L,
+                        100L
                 )
         );
     }
@@ -152,7 +187,8 @@ public class SettlementMenu extends AbstractContainerMenu {
         String leaderName = resolvePlayerName(serverPlayer, settlement.getLeaderUuid());
 
         SettlementMember self = settlement.getMember(serverPlayer.getUUID());
-        boolean canViewWars = settlement.isLeader(serverPlayer.getUUID())
+        boolean canViewWars = serverPlayer.hasPermissions(2)
+                || settlement.isLeader(serverPlayer.getUUID())
                 || (self != null && self.getPermissionSet().has(SettlementPermission.VIEW_WAR_STATUS));
 
         List<SettlementWarView> warViews = new ArrayList<SettlementWarView>();
@@ -254,12 +290,16 @@ public class SettlementMenu extends AbstractContainerMenu {
             final OpenData openData,
             final int initialSelectedTab,
             final int initialWarPage,
-            final int initialReconstructionPage
+            final int initialReconstructionPage,
+            final long initialTreasuryActionAmount,
+            final long initialPersonalDebtActionAmount
     ) {
         return new ContainerData() {
             private int selectedTab = initialSelectedTab;
             private int warPage = Math.max(0, initialWarPage);
             private int reconstructionPage = Math.max(0, initialReconstructionPage);
+            private long treasuryActionAmount = clampActionAmount(initialTreasuryActionAmount);
+            private long personalDebtActionAmount = clampActionAmount(initialPersonalDebtActionAmount);
 
             private final UUID settlementId = openData.settlementId;
 
@@ -303,6 +343,10 @@ public class SettlementMenu extends AbstractContainerMenu {
                 if (permission == null) {
                     return false;
                 }
+                if (playerInventory.player instanceof ServerPlayer
+                        && ((ServerPlayer) playerInventory.player).hasPermissions(2)) {
+                    return true;
+                }
                 if (isLeader(settlement)) {
                     return true;
                 }
@@ -317,6 +361,24 @@ public class SettlementMenu extends AbstractContainerMenu {
                 return hasPermission(settlement, self, SettlementPermission.VIEW_SETTLEMENT_DEBT);
             }
 
+            private boolean canDepositTreasury(Settlement settlement, SettlementMember self) {
+                return hasPermission(settlement, self, SettlementPermission.DEPOSIT_TREASURY);
+            }
+
+            private boolean canWithdrawTreasury(Settlement settlement, SettlementMember self) {
+                return hasPermission(settlement, self, SettlementPermission.WITHDRAW_TREASURY);
+            }
+
+            private long clampActionAmount(long value) {
+                if (value < 1L) {
+                    return 1L;
+                }
+                if (value > 4294967295L) {
+                    return 4294967295L;
+                }
+                return value;
+            }
+
             private boolean canViewWarStatus(Settlement settlement, SettlementMember self) {
                 return hasPermission(settlement, self, SettlementPermission.VIEW_WAR_STATUS);
             }
@@ -324,11 +386,22 @@ public class SettlementMenu extends AbstractContainerMenu {
             private boolean canStopReconstruction(Settlement settlement, ReconstructionSession reconstruction) {
                 return settlement != null
                         && reconstruction != null
-                        && settlement.isLeader(playerInventory.player.getUUID());
+                        && ((playerInventory.player instanceof ServerPlayer
+                        && ((ServerPlayer) playerInventory.player).hasPermissions(2))
+                        || settlement.isLeader(playerInventory.player.getUUID()));
             }
 
             private boolean canOpenReconstructionStorage(Settlement settlement, SettlementMember self, ReconstructionSession reconstruction) {
-                if (settlement == null || reconstruction == null || self == null) {
+                if (settlement == null || reconstruction == null) {
+                    return false;
+                }
+
+                if (playerInventory.player instanceof ServerPlayer
+                        && ((ServerPlayer) playerInventory.player).hasPermissions(2)) {
+                    return true;
+                }
+
+                if (self == null) {
                     return false;
                 }
 
@@ -341,7 +414,16 @@ public class SettlementMenu extends AbstractContainerMenu {
             }
 
             private boolean canRestoreReconstruction(Settlement settlement, SettlementMember self, ReconstructionSession reconstruction) {
-                if (settlement == null || reconstruction == null || self == null) {
+                if (settlement == null || reconstruction == null) {
+                    return false;
+                }
+
+                if (playerInventory.player instanceof ServerPlayer
+                        && ((ServerPlayer) playerInventory.player).hasPermissions(2)) {
+                    return true;
+                }
+
+                if (self == null) {
                     return false;
                 }
 
@@ -375,7 +457,7 @@ public class SettlementMenu extends AbstractContainerMenu {
                     return settlement == null ? 0 : settlement.getClaimedChunkCount();
                 }
                 if (index == DATA_ALLOWANCE) {
-                    return settlement == null ? 0 : settlement.getPurchasedChunkAllowance();
+                    return settlement == null ? 0 : settlement.getClaimLimitByResidents();
                 }
                 if (index == DATA_IS_LEADER) {
                     return settlement != null && settlement.isLeader(playerInventory.player.getUUID()) ? 1 : 0;
@@ -455,6 +537,24 @@ public class SettlementMenu extends AbstractContainerMenu {
                 if (index == DATA_CAN_VIEW_WARS) {
                     return canViewWarStatus(settlement, self) ? 1 : 0;
                 }
+                if (index == DATA_TREASURY_ACTION_AMOUNT_WORD_0) {
+                    return getWord(treasuryActionAmount, 0);
+                }
+                if (index == DATA_TREASURY_ACTION_AMOUNT_WORD_1) {
+                    return getWord(treasuryActionAmount, 1);
+                }
+                if (index == DATA_CAN_DEPOSIT_TREASURY) {
+                    return canDepositTreasury(settlement, self) ? 1 : 0;
+                }
+                if (index == DATA_CAN_WITHDRAW_TREASURY) {
+                    return canWithdrawTreasury(settlement, self) ? 1 : 0;
+                }
+                if (index == DATA_PERSONAL_DEBT_ACTION_AMOUNT_WORD_0) {
+                    return getWord(personalDebtActionAmount, 0);
+                }
+                if (index == DATA_PERSONAL_DEBT_ACTION_AMOUNT_WORD_1) {
+                    return getWord(personalDebtActionAmount, 1);
+                }
 
                 return 0;
             }
@@ -471,6 +571,22 @@ public class SettlementMenu extends AbstractContainerMenu {
                 }
                 if (index == DATA_RECONSTRUCTION_PAGE) {
                     reconstructionPage = Math.max(0, value);
+                    return;
+                }
+                if (index == DATA_TREASURY_ACTION_AMOUNT_WORD_0) {
+                    treasuryActionAmount = clampActionAmount((treasuryActionAmount & 0xFFFF0000L) | ((long) value & 0xFFFFL));
+                    return;
+                }
+                if (index == DATA_TREASURY_ACTION_AMOUNT_WORD_1) {
+                    treasuryActionAmount = clampActionAmount((treasuryActionAmount & 0x0000FFFFL) | (((long) value & 0xFFFFL) << 16));
+                    return;
+                }
+                if (index == DATA_PERSONAL_DEBT_ACTION_AMOUNT_WORD_0) {
+                    personalDebtActionAmount = clampActionAmount((personalDebtActionAmount & 0xFFFF0000L) | ((long) value & 0xFFFFL));
+                    return;
+                }
+                if (index == DATA_PERSONAL_DEBT_ACTION_AMOUNT_WORD_1) {
+                    personalDebtActionAmount = clampActionAmount((personalDebtActionAmount & 0x0000FFFFL) | (((long) value & 0xFFFFL) << 16));
                 }
             }
 
@@ -542,6 +658,10 @@ public class SettlementMenu extends AbstractContainerMenu {
     }
 
     public int getPurchasedChunkAllowance() {
+        return menuData.get(DATA_ALLOWANCE);
+    }
+
+    public int getClaimLimitByResidents() {
         return menuData.get(DATA_ALLOWANCE);
     }
 
@@ -617,6 +737,32 @@ public class SettlementMenu extends AbstractContainerMenu {
         return menuData.get(DATA_CAN_VIEW_WARS) != 0;
     }
 
+    public long getTreasuryActionAmount() {
+        return readWords(menuData, DATA_TREASURY_ACTION_AMOUNT_WORD_0, 2);
+    }
+
+    public boolean canDepositTreasury() {
+        return menuData.get(DATA_CAN_DEPOSIT_TREASURY) != 0;
+    }
+
+    public boolean canWithdrawTreasury() {
+        return menuData.get(DATA_CAN_WITHDRAW_TREASURY) != 0;
+    }
+
+    public long getPersonalDebtActionAmount() {
+        return readWords(menuData, DATA_PERSONAL_DEBT_ACTION_AMOUNT_WORD_0, 2);
+    }
+
+    private void setTreasuryActionAmount(long amount) {
+        menuData.set(DATA_TREASURY_ACTION_AMOUNT_WORD_0, getWord(amount, 0));
+        menuData.set(DATA_TREASURY_ACTION_AMOUNT_WORD_1, getWord(amount, 1));
+    }
+
+    private void setPersonalDebtActionAmount(long amount) {
+        menuData.set(DATA_PERSONAL_DEBT_ACTION_AMOUNT_WORD_0, getWord(amount, 0));
+        menuData.set(DATA_PERSONAL_DEBT_ACTION_AMOUNT_WORD_1, getWord(amount, 1));
+    }
+
     public void clientSetReconstructionEntrySkipped(int oneBasedIndex, boolean skipped) {
         for (int i = 0; i < reconstructionViews.size(); i++) {
             SettlementReconstructionEntryView view = reconstructionViews.get(i);
@@ -635,6 +781,12 @@ public class SettlementMenu extends AbstractContainerMenu {
     public boolean clickMenuButton(Player player, int buttonId) {
         if (buttonId == BUTTON_TAB_OVERVIEW) {
             menuData.set(DATA_SELECTED_TAB, SettlementMenuTab.OVERVIEW.getIndex());
+            broadcastChanges();
+            return true;
+        }
+
+        if (buttonId == BUTTON_TAB_TREASURY) {
+            menuData.set(DATA_SELECTED_TAB, SettlementMenuTab.TREASURY.getIndex());
             broadcastChanges();
             return true;
         }
@@ -689,6 +841,148 @@ public class SettlementMenu extends AbstractContainerMenu {
                 return true;
             }
 
+            if (buttonId == BUTTON_PERSONAL_DEBT_AMOUNT_MINUS_1000) {
+                setPersonalDebtActionAmount(adjustActionAmount(getPersonalDebtActionAmount(), -1000L));
+                broadcastChanges();
+                return true;
+            }
+
+            if (buttonId == BUTTON_PERSONAL_DEBT_AMOUNT_MINUS_100) {
+                setPersonalDebtActionAmount(adjustActionAmount(getPersonalDebtActionAmount(), -100L));
+                broadcastChanges();
+                return true;
+            }
+
+            if (buttonId == BUTTON_PERSONAL_DEBT_AMOUNT_MINUS_10) {
+                setPersonalDebtActionAmount(adjustActionAmount(getPersonalDebtActionAmount(), -10L));
+                broadcastChanges();
+                return true;
+            }
+
+            if (buttonId == BUTTON_PERSONAL_DEBT_AMOUNT_MINUS_1) {
+                setPersonalDebtActionAmount(adjustActionAmount(getPersonalDebtActionAmount(), -1L));
+                broadcastChanges();
+                return true;
+            }
+
+            if (buttonId == BUTTON_PERSONAL_DEBT_AMOUNT_PLUS_1) {
+                setPersonalDebtActionAmount(adjustActionAmount(getPersonalDebtActionAmount(), 1L));
+                broadcastChanges();
+                return true;
+            }
+
+            if (buttonId == BUTTON_PERSONAL_DEBT_AMOUNT_PLUS_10) {
+                setPersonalDebtActionAmount(adjustActionAmount(getPersonalDebtActionAmount(), 10L));
+                broadcastChanges();
+                return true;
+            }
+
+            if (buttonId == BUTTON_PERSONAL_DEBT_AMOUNT_PLUS_100) {
+                setPersonalDebtActionAmount(adjustActionAmount(getPersonalDebtActionAmount(), 100L));
+                broadcastChanges();
+                return true;
+            }
+
+            if (buttonId == BUTTON_PERSONAL_DEBT_AMOUNT_PLUS_1000) {
+                setPersonalDebtActionAmount(adjustActionAmount(getPersonalDebtActionAmount(), 1000L));
+                broadcastChanges();
+                return true;
+            }
+
+            if (buttonId == BUTTON_PERSONAL_DEBT_PAY_SELECTED) {
+                long paid = TaxService.payOwnPersonalDebt(serverPlayer, getPersonalDebtActionAmount());
+                refreshOpenMenusForSettlement(serverPlayer, settlementId);
+                serverPlayer.displayClientMessage(Component.literal("Личный долг оплачен на сумму: " + paid), false);
+                return true;
+            }
+
+            if (buttonId == BUTTON_PERSONAL_DEBT_PAY_ALL) {
+                long paid = TaxService.payOwnPersonalDebt(serverPlayer, getPlayerDebt());
+                refreshOpenMenusForSettlement(serverPlayer, settlementId);
+                serverPlayer.displayClientMessage(Component.literal("Личный долг полностью оплачен: " + paid), false);
+                return true;
+            }
+
+            if (buttonId == BUTTON_TREASURY_AMOUNT_MINUS_1000) {
+                setTreasuryActionAmount(adjustActionAmount(getTreasuryActionAmount(), -1000L));
+                broadcastChanges();
+                return true;
+            }
+
+            if (buttonId == BUTTON_TREASURY_AMOUNT_MINUS_100) {
+                setTreasuryActionAmount(adjustActionAmount(getTreasuryActionAmount(), -100L));
+                broadcastChanges();
+                return true;
+            }
+
+            if (buttonId == BUTTON_TREASURY_AMOUNT_MINUS_10) {
+                setTreasuryActionAmount(adjustActionAmount(getTreasuryActionAmount(), -10L));
+                broadcastChanges();
+                return true;
+            }
+
+            if (buttonId == BUTTON_TREASURY_AMOUNT_MINUS_1) {
+                setTreasuryActionAmount(adjustActionAmount(getTreasuryActionAmount(), -1L));
+                broadcastChanges();
+                return true;
+            }
+
+            if (buttonId == BUTTON_TREASURY_AMOUNT_PLUS_1) {
+                setTreasuryActionAmount(adjustActionAmount(getTreasuryActionAmount(), 1L));
+                broadcastChanges();
+                return true;
+            }
+
+            if (buttonId == BUTTON_TREASURY_AMOUNT_PLUS_10) {
+                setTreasuryActionAmount(adjustActionAmount(getTreasuryActionAmount(), 10L));
+                broadcastChanges();
+                return true;
+            }
+
+            if (buttonId == BUTTON_TREASURY_AMOUNT_PLUS_100) {
+                setTreasuryActionAmount(adjustActionAmount(getTreasuryActionAmount(), 100L));
+                broadcastChanges();
+                return true;
+            }
+
+            if (buttonId == BUTTON_TREASURY_AMOUNT_PLUS_1000) {
+                setTreasuryActionAmount(adjustActionAmount(getTreasuryActionAmount(), 1000L));
+                broadcastChanges();
+                return true;
+            }
+
+            if (buttonId == BUTTON_TREASURY_DEPOSIT_SELECTED) {
+                if (!canDepositTreasury(serverPlayer, settlement, self)) {
+                    throw new IllegalStateException("Нет права пополнять казну поселения.");
+                }
+                long amount = getTreasuryActionAmount();
+                TreasuryService.depositCurrency(serverPlayer, amount);
+                refreshOpenMenusForSettlement(serverPlayer, settlementId);
+                serverPlayer.displayClientMessage(Component.literal("В казну внесено: " + amount), true);
+                return true;
+            }
+
+            if (buttonId == BUTTON_TREASURY_WITHDRAW_SELECTED) {
+                if (!canWithdrawTreasury(serverPlayer, settlement, self)) {
+                    throw new IllegalStateException("Нет права выводить средства из казны.");
+                }
+                long amount = getTreasuryActionAmount();
+                TreasuryService.withdrawCurrency(serverPlayer, amount);
+                refreshOpenMenusForSettlement(serverPlayer, settlementId);
+                serverPlayer.displayClientMessage(Component.literal("Из казны выведено: " + amount), true);
+                return true;
+            }
+
+            if (buttonId == BUTTON_TREASURY_DEPOSIT_ALL) {
+                if (!canDepositTreasury(serverPlayer, settlement, self)) {
+                    throw new IllegalStateException("Нет права пополнять казну поселения.");
+                }
+                long deposited = TreasuryService.depositAllCurrency(serverPlayer);
+                refreshOpenMenusForSettlement(serverPlayer, settlementId);
+                serverPlayer.displayClientMessage(Component.literal("В казну внесено все: " + deposited), true);
+                return true;
+            }
+
             if (buttonId == BUTTON_STOP_RECONSTRUCTION) {
                 if (!canForceStopReconstruction(serverPlayer, settlement, reconstruction)) {
                     throw new IllegalStateException("Нет права на принудительную остановку реконструкции.");
@@ -737,7 +1031,7 @@ public class SettlementMenu extends AbstractContainerMenu {
                 return true;
             }
         } catch (Exception e) {
-            serverPlayer.displayClientMessage(Component.literal(messageOrDefault(e, "Ошибка выполнения действия.")), true);
+            serverPlayer.displayClientMessage(Component.literal(messageOrDefault(e, "Ошибка выполнения действия.")), false);
             return false;
         }
 
@@ -765,7 +1059,13 @@ public class SettlementMenu extends AbstractContainerMenu {
     }
 
     private static boolean canOpenReconstructionStorage(ServerPlayer actor, Settlement settlement, SettlementMember self, ReconstructionSession reconstruction) {
-        if (settlement == null || reconstruction == null || self == null) {
+        if (settlement == null || reconstruction == null) {
+            return false;
+        }
+        if (actor.hasPermissions(2)) {
+            return true;
+        }
+        if (self == null) {
             return false;
         }
         if (settlement.isLeader(actor.getUUID())) {
@@ -776,7 +1076,13 @@ public class SettlementMenu extends AbstractContainerMenu {
     }
 
     private static boolean canRestoreReconstruction(ServerPlayer actor, Settlement settlement, SettlementMember self, ReconstructionSession reconstruction) {
-        if (settlement == null || reconstruction == null || self == null) {
+        if (settlement == null || reconstruction == null) {
+            return false;
+        }
+        if (actor.hasPermissions(2)) {
+            return true;
+        }
+        if (self == null) {
             return false;
         }
         if (settlement.isLeader(actor.getUUID())) {
@@ -793,7 +1099,44 @@ public class SettlementMenu extends AbstractContainerMenu {
     private static boolean canForceStopReconstruction(ServerPlayer actor, Settlement settlement, ReconstructionSession reconstruction) {
         return settlement != null
                 && reconstruction != null
-                && settlement.isLeader(actor.getUUID());
+                && (actor.hasPermissions(2) || settlement.isLeader(actor.getUUID()));
+    }
+
+    private static boolean canDepositTreasury(ServerPlayer actor, Settlement settlement, SettlementMember self) {
+        if (settlement == null) {
+            return false;
+        }
+        if (actor.hasPermissions(2)) {
+            return true;
+        }
+        if (settlement.isLeader(actor.getUUID())) {
+            return true;
+        }
+        return self != null && self.getPermissionSet().has(SettlementPermission.DEPOSIT_TREASURY);
+    }
+
+    private static boolean canWithdrawTreasury(ServerPlayer actor, Settlement settlement, SettlementMember self) {
+        if (settlement == null) {
+            return false;
+        }
+        if (actor.hasPermissions(2)) {
+            return true;
+        }
+        if (settlement.isLeader(actor.getUUID())) {
+            return true;
+        }
+        return self != null && self.getPermissionSet().has(SettlementPermission.WITHDRAW_TREASURY);
+    }
+
+    private static long adjustActionAmount(long currentAmount, long delta) {
+        long updated = currentAmount + delta;
+        if (updated < 1L) {
+            return 1L;
+        }
+        if (updated > 4294967295L) {
+            return 4294967295L;
+        }
+        return updated;
     }
 
     private void reopenFor(final ServerPlayer serverPlayer) {
@@ -804,7 +1147,8 @@ public class SettlementMenu extends AbstractContainerMenu {
         Settlement settlement = data.getSettlement(settlementId);
         SettlementMember self = settlement == null ? null : settlement.getMember(serverPlayer.getUUID());
         boolean canViewWars = settlement != null
-                && (settlement.isLeader(serverPlayer.getUUID())
+                && (serverPlayer.hasPermissions(2)
+                || settlement.isLeader(serverPlayer.getUUID())
                 || (self != null && self.getPermissionSet().has(SettlementPermission.VIEW_WAR_STATUS)));
 
         if (selectedTabValue == SettlementMenuTab.WAR.getIndex() && !canViewWars) {
@@ -814,6 +1158,8 @@ public class SettlementMenu extends AbstractContainerMenu {
         final int selectedTab = selectedTabValue;
         final int warPage = getWarPage();
         final int reconstructionPage = getReconstructionPage();
+        final long treasuryActionAmount = getTreasuryActionAmount();
+        final long personalDebtActionAmount = getPersonalDebtActionAmount();
 
         NetworkHooks.openScreen(
                 serverPlayer,
@@ -827,7 +1173,9 @@ public class SettlementMenu extends AbstractContainerMenu {
                                         openData,
                                         selectedTab,
                                         warPage,
-                                        reconstructionPage
+                                        reconstructionPage,
+                                        treasuryActionAmount,
+                                        personalDebtActionAmount
                                 )
                         ),
                         Component.literal(settlementName)
@@ -890,8 +1238,16 @@ public class SettlementMenu extends AbstractContainerMenu {
         }
 
         ServerPlayer serverPlayer = (ServerPlayer) player;
-        Settlement settlement = SettlementSavedData.get(serverPlayer.server).getSettlementByPlayer(serverPlayer.getUUID());
-        return settlement != null && settlement.getId().equals(settlementId);
+        SettlementSavedData data = SettlementSavedData.get(serverPlayer.server);
+        Settlement settlement = data.getSettlement(settlementId);
+        if (settlement == null) {
+            return false;
+        }
+        if (serverPlayer.hasPermissions(2)) {
+            return true;
+        }
+        Settlement ownSettlement = data.getSettlementByPlayer(serverPlayer.getUUID());
+        return ownSettlement != null && ownSettlement.getId().equals(settlementId);
     }
 
     private static final class OpenData {

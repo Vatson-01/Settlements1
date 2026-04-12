@@ -14,6 +14,8 @@ import java.util.Set;
 import java.util.UUID;
 
 public class Settlement {
+    public static final int CLAIMED_CHUNKS_PER_MEMBER = 4;
+
     private final UUID id;
     private String name;
     private UUID leaderUuid;
@@ -92,6 +94,10 @@ public class Settlement {
 
     public int getPurchasedChunkAllowance() {
         return purchasedChunkAllowance;
+    }
+
+    public int getClaimLimitByResidents() {
+        return members.size() * CLAIMED_CHUNKS_PER_MEMBER;
     }
 
     public long getCreatedAt() {

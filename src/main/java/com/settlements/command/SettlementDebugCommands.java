@@ -5,12 +5,14 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.LongArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import com.mojang.brigadier.context.CommandContext;
-import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.Suggestions;
-import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import com.settlements.SettlementsMod;
 import com.settlements.data.SettlementSavedData;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import net.minecraft.world.level.block.ButtonBlock;
+import net.minecraft.world.level.block.LeverBlock;
 import com.settlements.data.model.PlotPermission;
 import com.settlements.data.model.PlotPermissionSet;
 import com.settlements.data.model.ReconstructionBlockEntry;
@@ -34,22 +36,36 @@ import com.settlements.service.TaxService;
 import com.settlements.service.TreasuryService;
 import com.settlements.service.WarService;
 import com.settlements.world.menu.SettlementResidentManageMenu;
+import com.settlements.util.BlockPosKeyUtil;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.MenuProvider;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.DoorBlock;
+import net.minecraft.world.level.block.FenceGateBlock;
+import net.minecraft.world.level.block.TrapDoorBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import com.settlements.world.menu.SettlementResidentsMenu;
+import net.minecraftforge.common.capabilities.ForgeCapabilities;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import java.util.stream.Stream;
 
 @Mod.EventBusSubscriber(modid = SettlementsMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
@@ -86,9 +102,237 @@ public final class SettlementDebugCommands {
                         .then(buildSettlementMenuNode())
                         .then(buildResidentManageMenuNode())
                         .then(buildResidentsMenuNode())
-                        .then(buildTransferLeaderNode())
+                        .then(buildPublicNode())
                         .then(buildGlobalPlotAccessNode())
         );
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> buildPublicNode() {
+        return Commands.literal("public")
+                .then(Commands.literal("door")
+                        .then(Commands.literal("add").executes(SettlementDebugCommands::makeLookedDoorPublic))
+                        .then(Commands.literal("remove").executes(SettlementDebugCommands::makeLookedDoorPrivate))
+                        .then(Commands.literal("info").executes(SettlementDebugCommands::showLookedDoorPublicInfo))
+                        .then(Commands.literal("control")
+                                .then(Commands.literal("add").executes(SettlementDebugCommands::makeLookedDoorControlPublic))
+                                .then(Commands.literal("remove").executes(SettlementDebugCommands::makeLookedDoorControlPrivate))
+                                .then(Commands.literal("info").executes(SettlementDebugCommands::showLookedDoorControlPublicInfo))))
+                .then(Commands.literal("container")
+                        .then(Commands.literal("add").executes(SettlementDebugCommands::makeLookedContainerPublic))
+                        .then(Commands.literal("remove").executes(SettlementDebugCommands::makeLookedContainerPrivate))
+                        .then(Commands.literal("info").executes(SettlementDebugCommands::showLookedContainerPublicInfo)))
+                .then(Commands.literal("list")
+                        .executes(context -> listPublicEntries(context, "all"))
+                        .then(Commands.literal("door").executes(context -> listPublicEntries(context, "door")))
+                        .then(Commands.literal("control").executes(context -> listPublicEntries(context, "control")))
+                        .then(Commands.literal("container").executes(context -> listPublicEntries(context, "container"))))
+                .then(Commands.literal("clearchunk")
+                        .executes(context -> clearPublicInChunk(context, "all"))
+                        .then(Commands.literal("door").executes(context -> clearPublicInChunk(context, "door")))
+                        .then(Commands.literal("control").executes(context -> clearPublicInChunk(context, "control")))
+                        .then(Commands.literal("container").executes(context -> clearPublicInChunk(context, "container"))))
+                .then(Commands.literal("clearsettlement")
+                        .executes(context -> clearPublicForSettlement(context, "all"))
+                        .then(Commands.literal("door").executes(context -> clearPublicForSettlement(context, "door")))
+                        .then(Commands.literal("control").executes(context -> clearPublicForSettlement(context, "control")))
+                        .then(Commands.literal("container").executes(context -> clearPublicForSettlement(context, "container"))))
+                .then(Commands.literal("clearall")
+                        .executes(context -> clearAllPublicEntries(context, "all"))
+                        .then(Commands.literal("door").executes(context -> clearAllPublicEntries(context, "door")))
+                        .then(Commands.literal("control").executes(context -> clearAllPublicEntries(context, "control")))
+                        .then(Commands.literal("container").executes(context -> clearAllPublicEntries(context, "container"))));
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> buildGlobalPlotAccessNode() {
+        return Commands.literal("globalplotaccess")
+                .then(Commands.literal("grant")
+                        .then(Commands.argument("player", EntityArgument.player())
+                                .executes(context -> {
+                                    CommandSourceStack source = context.getSource();
+                                    ServerPlayer target = EntityArgument.getPlayer(context, "player");
+
+                                    SettlementSavedData data = SettlementSavedData.get(source.getServer());
+                                    data.setGlobalPlotAccess(target.getUUID(), true);
+
+                                    source.sendSuccess(
+                                            () -> Component.literal(
+                                                    "Игроку " + target.getGameProfile().getName()
+                                                            + " выдан полный доступ ко всем приватам всех поселений."
+                                            ),
+                                            true
+                                    );
+                                    return 1;
+                                })))
+                .then(Commands.literal("revoke")
+                        .then(Commands.argument("player", EntityArgument.player())
+                                .executes(context -> {
+                                    CommandSourceStack source = context.getSource();
+                                    ServerPlayer target = EntityArgument.getPlayer(context, "player");
+
+                                    SettlementSavedData data = SettlementSavedData.get(source.getServer());
+                                    data.setGlobalPlotAccess(target.getUUID(), false);
+
+                                    source.sendSuccess(
+                                            () -> Component.literal(
+                                                    "У игрока " + target.getGameProfile().getName()
+                                                            + " снят глобальный доступ ко всем приватам."
+                                            ),
+                                            true
+                                    );
+                                    return 1;
+                                })))
+                .then(Commands.literal("check")
+                        .then(Commands.argument("player", EntityArgument.player())
+                                .executes(context -> {
+                                    CommandSourceStack source = context.getSource();
+                                    ServerPlayer target = EntityArgument.getPlayer(context, "player");
+
+                                    SettlementSavedData data = SettlementSavedData.get(source.getServer());
+                                    boolean enabled = data.hasGlobalPlotAccess(target.getUUID());
+
+                                    source.sendSuccess(
+                                            () -> Component.literal(
+                                                    "Глобальный доступ игрока "
+                                                            + target.getGameProfile().getName()
+                                                            + ": " + (enabled ? "включен" : "выключен")
+                                            ),
+                                            false
+                                    );
+                                    return 1;
+                                })))
+                .then(Commands.literal("list")
+                        .executes(SettlementDebugCommands::listGlobalPlotAccess));
+    }
+
+
+    private static int listGlobalPlotAccess(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        SettlementSavedData data = SettlementSavedData.get(source.getServer());
+        Collection<UUID> playerUuids = data.getGlobalPlotAccessPlayers();
+
+        if (playerUuids.isEmpty()) {
+            source.sendSuccess(() -> Component.literal("Глобальный доступ не выдан никому."), false);
+            return 1;
+        }
+
+        source.sendSuccess(() -> Component.literal("Игроков с global plot access: " + playerUuids.size()), false);
+        for (UUID playerUuid : playerUuids) {
+            ServerPlayer online = source.getServer().getPlayerList().getPlayer(playerUuid);
+            final String label = online != null
+                    ? online.getGameProfile().getName() + " (" + playerUuid + ")"
+                    : playerUuid.toString();
+            source.sendSuccess(() -> Component.literal("- " + label), false);
+        }
+        return 1;
+    }
+
+    private static int listPublicEntries(CommandContext<CommandSourceStack> context, String mode) {
+        CommandSourceStack source = context.getSource();
+        SettlementSavedData data = SettlementSavedData.get(source.getServer());
+
+        if ("door".equals(mode) || "all".equals(mode)) {
+            printPublicEntries(source, "Публичные двери", data.getPublicDoorKeys());
+        }
+        if ("control".equals(mode) || "all".equals(mode)) {
+            printPublicEntries(source, "Публичные рычаги/кнопки", data.getPublicDoorControlKeys());
+        }
+        if ("container".equals(mode) || "all".equals(mode)) {
+            printPublicEntries(source, "Публичные контейнеры", data.getPublicContainerKeys());
+        }
+        return 1;
+    }
+
+    private static int clearPublicInChunk(CommandContext<CommandSourceStack> context, String mode) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayerOrException();
+        SettlementSavedData data = SettlementSavedData.get(source.getServer());
+        ChunkPos chunkPos = new ChunkPos(player.blockPosition());
+
+        int removed = 0;
+        if ("door".equals(mode) || "all".equals(mode)) {
+            removed += data.clearPublicDoorsInChunk(player.level(), chunkPos);
+        }
+        if ("control".equals(mode) || "all".equals(mode)) {
+            removed += data.clearPublicDoorControlsInChunk(player.level(), chunkPos);
+        }
+        if ("container".equals(mode) || "all".equals(mode)) {
+            removed += data.clearPublicContainersInChunk(player.level(), chunkPos);
+        }
+
+        final int removedFinal = removed;
+        final String chunkLabel = chunkPos.x + ", " + chunkPos.z;
+        source.sendSuccess(() -> Component.literal("Удалено публичных записей в чанке " + chunkLabel + ": " + removedFinal), true);
+        return 1;
+    }
+
+    private static int clearPublicForSettlement(CommandContext<CommandSourceStack> context, String mode) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayerOrException();
+        SettlementSavedData data = SettlementSavedData.get(source.getServer());
+        Settlement settlement = data.getSettlementByPlayer(player.getUUID());
+
+        if (settlement == null) {
+            source.sendFailure(Component.literal("Ты не состоишь в поселении."));
+            return 0;
+        }
+
+        int removed = 0;
+        if ("door".equals(mode) || "all".equals(mode)) {
+            removed += data.clearPublicDoorsForSettlement(settlement);
+        }
+        if ("control".equals(mode) || "all".equals(mode)) {
+            removed += data.clearPublicDoorControlsForSettlement(settlement);
+        }
+        if ("container".equals(mode) || "all".equals(mode)) {
+            removed += data.clearPublicContainersForSettlement(settlement);
+        }
+
+        final int removedFinal = removed;
+        final String settlementName = settlement.getName();
+        source.sendSuccess(() -> Component.literal("Удалено публичных записей у поселения \"" + settlementName + "\": " + removedFinal), true);
+        return 1;
+    }
+
+    private static int clearAllPublicEntries(CommandContext<CommandSourceStack> context, String mode) {
+        CommandSourceStack source = context.getSource();
+        SettlementSavedData data = SettlementSavedData.get(source.getServer());
+
+        int removed = 0;
+        if ("door".equals(mode) || "all".equals(mode)) {
+            removed += data.clearAllPublicDoors();
+        }
+        if ("control".equals(mode) || "all".equals(mode)) {
+            removed += data.clearAllPublicDoorControls();
+        }
+        if ("container".equals(mode) || "all".equals(mode)) {
+            removed += data.clearAllPublicContainers();
+        }
+
+        final int removedFinal = removed;
+        source.sendSuccess(() -> Component.literal("Удалено всех публичных записей: " + removedFinal), true);
+        return 1;
+    }
+
+    private static void printPublicEntries(CommandSourceStack source, String title, Collection<String> keys) {
+        source.sendSuccess(() -> Component.literal(title + ": " + keys.size()), false);
+
+        int shown = 0;
+        for (String key : keys) {
+            final String formatted = formatPublicKey(key);
+            source.sendSuccess(() -> Component.literal("- " + formatted), false);
+            shown++;
+            if (shown >= 20 && keys.size() > shown) {
+                final int remaining = keys.size() - shown;
+                source.sendSuccess(() -> Component.literal("... и еще " + remaining), false);
+                break;
+            }
+        }
+    }
+
+    private static String formatPublicKey(String key) {
+        BlockPos pos = BlockPosKeyUtil.fromKey(key);
+        String dimensionId = BlockPosKeyUtil.getDimensionId(key);
+        return dimensionId + " @ " + pos.getX() + " " + pos.getY() + " " + pos.getZ();
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> buildMoneyNode() {
@@ -106,7 +350,10 @@ public final class SettlementDebugCommands {
     }
     private static LiteralArgumentBuilder<CommandSourceStack> buildSettlementMenuNode() {
         return Commands.literal("menu")
-                .executes(SettlementDebugCommands::openSettlementMenu);
+                .executes(SettlementDebugCommands::openSettlementMenu)
+                .then(Commands.argument("settlement", StringArgumentType.string())
+                        .suggests(SettlementDebugCommands::suggestSettlementNames)
+                        .executes(SettlementDebugCommands::openSettlementMenuForSettlement));
     }
     private static LiteralArgumentBuilder<CommandSourceStack> buildResidentManageMenuNode() {
         return Commands.literal("residentmenu")
@@ -115,7 +362,10 @@ public final class SettlementDebugCommands {
     }
     private static LiteralArgumentBuilder<CommandSourceStack> buildResidentsMenuNode() {
         return Commands.literal("residentsmenu")
-                .executes(SettlementDebugCommands::openResidentsMenu);
+                .executes(SettlementDebugCommands::openResidentsMenu)
+                .then(Commands.argument("settlement", StringArgumentType.string())
+                        .suggests(SettlementDebugCommands::suggestSettlementNames)
+                        .executes(SettlementDebugCommands::openResidentsMenuForSettlement));
     }
 
     private static int openResidentsMenu(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
@@ -125,7 +375,7 @@ public final class SettlementDebugCommands {
         SettlementSavedData data = SettlementSavedData.get(actor.server);
         Settlement settlement = data.getSettlementByPlayer(actor.getUUID());
         if (settlement == null) {
-            source.sendFailure(Component.literal("Ты не состоишь в поселении."));
+            source.sendFailure(Component.literal("Ты не состоишь в поселении. Укажи название поселения явно."));
             return 0;
         }
 
@@ -133,21 +383,26 @@ public final class SettlementDebugCommands {
         source.sendSuccess(() -> Component.literal("Открыт список жителей поселения."), true);
         return 1;
     }
+
+    private static int openResidentsMenuForSettlement(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer actor = source.getPlayerOrException();
+        Settlement settlement = requireSettlementByName(context, "settlement");
+
+        SettlementResidentsMenu.openFor(actor, settlement.getId());
+        source.sendSuccess(() -> Component.literal("Открыт список жителей поселения: " + settlement.getName()), true);
+        return 1;
+    }
+
     private static int openResidentManageMenu(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         CommandSourceStack source = context.getSource();
         ServerPlayer actor = source.getPlayerOrException();
         ServerPlayer target = EntityArgument.getPlayer(context, "player");
 
         SettlementSavedData data = SettlementSavedData.get(actor.server);
-        Settlement settlement = data.getSettlementByPlayer(actor.getUUID());
+        Settlement settlement = data.getSettlementByPlayer(target.getUUID());
         if (settlement == null) {
-            source.sendFailure(Component.literal("Ты не состоишь в поселении."));
-            return 0;
-        }
-
-        SettlementMember targetMember = settlement.getMember(target.getUUID());
-        if (targetMember == null) {
-            source.sendFailure(Component.literal("Этот игрок не состоит в твоем поселении."));
+            source.sendFailure(Component.literal("Этот игрок не состоит в поселении."));
             return 0;
         }
 
@@ -155,6 +410,7 @@ public final class SettlementDebugCommands {
         source.sendSuccess(() -> Component.literal("Открыто меню жителя: " + target.getGameProfile().getName()), true);
         return 1;
     }
+
     private static int openSettlementMenu(CommandContext<CommandSourceStack> context) {
         CommandSourceStack source = context.getSource();
 
@@ -167,8 +423,29 @@ public final class SettlementDebugCommands {
         }
 
         try {
-            SettlementMenuService.openMenu(player);
+            SettlementSavedData data = SettlementSavedData.get(player.server);
+            Settlement settlement = data.getSettlementByPlayer(player.getUUID());
+            if (settlement == null) {
+                source.sendFailure(Component.literal("Ты не состоишь в поселении. Укажи название поселения явно."));
+                return 0;
+            }
+            SettlementMenuService.openMenu(player, settlement.getId());
             source.sendSuccess(() -> Component.literal("Меню поселения открыто."), true);
+            return 1;
+        } catch (IllegalStateException ex) {
+            source.sendFailure(Component.literal(ex.getMessage()));
+            return 0;
+        }
+    }
+
+    private static int openSettlementMenuForSettlement(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayerOrException();
+        Settlement settlement = requireSettlementByName(context, "settlement");
+
+        try {
+            SettlementMenuService.openMenu(player, settlement.getId());
+            source.sendSuccess(() -> Component.literal("Меню поселения открыто: " + settlement.getName()), true);
             return 1;
         } catch (IllegalStateException ex) {
             source.sendFailure(Component.literal(ex.getMessage()));
@@ -633,22 +910,42 @@ public final class SettlementDebugCommands {
         return Commands.literal("claim")
                 .executes(context -> {
                     ServerPlayer player = context.getSource().getPlayerOrException();
-                    ClaimService.claimCurrentChunk(player);
+                    SettlementSavedData data = SettlementSavedData.get(player.server);
+                    Settlement settlement = data.getSettlementByPlayer(player.getUUID());
+                    if (settlement == null) {
+                        context.getSource().sendFailure(Component.literal("Ты не состоишь в поселении. Укажи название поселения явно."));
+                        return 0;
+                    }
+                    ClaimService.claimCurrentChunkForSettlement(player, settlement.getId());
 
                     ChunkPos chunkPos = new ChunkPos(player.blockPosition());
                     context.getSource().sendSuccess(
-                            () -> Component.literal("Чанк заклеймлен: " + chunkPos.x + ", " + chunkPos.z),
+                            () -> Component.literal("Чанк заклеймлен за поселением " + settlement.getName() + ": " + chunkPos.x + ", " + chunkPos.z),
                             true
                     );
                     return 1;
-                });
+                })
+                .then(Commands.argument("settlement", StringArgumentType.string())
+                        .suggests(SettlementDebugCommands::suggestSettlementNames)
+                        .executes(context -> {
+                            ServerPlayer player = context.getSource().getPlayerOrException();
+                            Settlement settlement = requireSettlementByName(context, "settlement");
+                            ClaimService.claimCurrentChunkForSettlement(player, settlement.getId());
+
+                            ChunkPos chunkPos = new ChunkPos(player.blockPosition());
+                            context.getSource().sendSuccess(
+                                    () -> Component.literal("Чанк заклеймлен за поселением " + settlement.getName() + ": " + chunkPos.x + ", " + chunkPos.z),
+                                    true
+                            );
+                            return 1;
+                        }));
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> buildUnclaimNode() {
         return Commands.literal("unclaim")
                 .executes(context -> {
                     ServerPlayer player = context.getSource().getPlayerOrException();
-                    ClaimService.unclaimCurrentChunk(player);
+                    ClaimService.adminUnclaimCurrentChunk(player);
 
                     ChunkPos chunkPos = new ChunkPos(player.blockPosition());
                     context.getSource().sendSuccess(
@@ -670,7 +967,7 @@ public final class SettlementDebugCommands {
                             Settlement settlement = data.getSettlementByPlayer(player.getUUID());
 
                             if (settlement == null) {
-                                context.getSource().sendFailure(Component.literal("Ты не состоишь в поселении."));
+                                context.getSource().sendFailure(Component.literal("Ты не состоишь в поселении. Укажи название поселения явно."));
                                 return 0;
                             }
 
@@ -678,11 +975,28 @@ public final class SettlementDebugCommands {
                             data.markChanged();
 
                             context.getSource().sendSuccess(
-                                    () -> Component.literal("Лимит купленных чанков установлен: " + amount),
+                                    () -> Component.literal("Лимит купленных чанков установлен для " + settlement.getName() + ": " + amount),
                                     true
                             );
                             return 1;
-                        }));
+                        })
+                        .then(Commands.argument("settlement", StringArgumentType.string())
+                                .suggests(SettlementDebugCommands::suggestSettlementNames)
+                                .executes(context -> {
+                                    ServerPlayer player = context.getSource().getPlayerOrException();
+                                    int amount = IntegerArgumentType.getInteger(context, "amount");
+                                    Settlement settlement = requireSettlementByName(context, "settlement");
+                                    SettlementSavedData data = SettlementSavedData.get(context.getSource().getServer());
+
+                                    settlement.setPurchasedChunkAllowance(amount, player.level().getGameTime());
+                                    data.markChanged();
+
+                                    context.getSource().sendSuccess(
+                                            () -> Component.literal("Лимит купленных чанков установлен для " + settlement.getName() + ": " + amount),
+                                            true
+                                    );
+                                    return 1;
+                                })));
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> buildPlotNode() {
@@ -1151,18 +1465,33 @@ public final class SettlementDebugCommands {
         return Commands.literal("disband")
                 .executes(context -> {
                     ServerPlayer player = context.getSource().getPlayerOrException();
+                    SettlementSavedData data = SettlementSavedData.get(context.getSource().getServer());
+                    Settlement settlement = data.getSettlementByPlayer(player.getUUID());
+                    if (settlement == null) {
+                        context.getSource().sendFailure(Component.literal("Ты не состоишь в поселении. Укажи название поселения явно."));
+                        return 0;
+                    }
 
-                    SettlementService.disbandSettlementOfPlayer(
-                            context.getSource().getServer(),
-                            player.getUUID()
-                    );
+                    SettlementService.disbandSettlement(context.getSource().getServer(), settlement.getId());
 
                     context.getSource().sendSuccess(
-                            () -> Component.literal("Поселение распущено."),
+                            () -> Component.literal("Поселение распущено: " + settlement.getName()),
                             true
                     );
                     return 1;
-                });
+                })
+                .then(Commands.argument("settlement", StringArgumentType.string())
+                        .suggests(SettlementDebugCommands::suggestSettlementNames)
+                        .executes(context -> {
+                            Settlement settlement = requireSettlementByName(context, "settlement");
+                            SettlementService.disbandSettlement(context.getSource().getServer(), settlement.getId());
+
+                            context.getSource().sendSuccess(
+                                    () -> Component.literal("Поселение распущено: " + settlement.getName()),
+                                    true
+                            );
+                            return 1;
+                        }));
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> buildAddMemberNode() {
@@ -1176,29 +1505,46 @@ public final class SettlementDebugCommands {
                             Settlement settlement = data.getSettlementByPlayer(sourcePlayer.getUUID());
 
                             if (settlement == null) {
-                                context.getSource().sendFailure(Component.literal("Ты не состоишь в поселении."));
-                                return 0;
-                            }
-
-                            if (!settlement.isLeader(sourcePlayer.getUUID())) {
-                                context.getSource().sendFailure(Component.literal("Добавлять жителей может только глава."));
+                                context.getSource().sendFailure(Component.literal("Ты не состоишь в поселении. Укажи название поселения явно."));
                                 return 0;
                             }
 
                             SettlementService.addMember(
                                     context.getSource().getServer(),
                                     settlement.getId(),
-                                    sourcePlayer.getUUID(),
                                     target.getUUID(),
                                     sourcePlayer.level().getGameTime()
                             );
 
+                            refreshCommandTrees(context.getSource().getServer(), sourcePlayer, target);
                             context.getSource().sendSuccess(
                                     () -> Component.literal("Игрок добавлен в поселение: " + target.getGameProfile().getName()),
                                     true
                             );
                             return 1;
-                        }));
+                        }))
+                .then(Commands.argument("settlement", StringArgumentType.string())
+                        .suggests(SettlementDebugCommands::suggestSettlementNames)
+                        .then(Commands.argument("player", EntityArgument.player())
+                                .executes(context -> {
+                                    ServerPlayer sourcePlayer = context.getSource().getPlayerOrException();
+                                    ServerPlayer target = EntityArgument.getPlayer(context, "player");
+                                    Settlement settlement = requireSettlementByName(context, "settlement");
+
+                                    SettlementService.addMember(
+                                            context.getSource().getServer(),
+                                            settlement.getId(),
+                                            target.getUUID(),
+                                            sourcePlayer.level().getGameTime()
+                                    );
+
+                                    refreshCommandTrees(context.getSource().getServer(), sourcePlayer, target);
+                                    context.getSource().sendSuccess(
+                                            () -> Component.literal("Игрок добавлен в поселение " + settlement.getName() + ": " + target.getGameProfile().getName()),
+                                            true
+                                    );
+                                    return 1;
+                                })));
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> buildRemoveMemberNode() {
@@ -1210,134 +1556,74 @@ public final class SettlementDebugCommands {
 
                             SettlementSavedData data = SettlementSavedData.get(context.getSource().getServer());
                             Settlement settlement = data.getSettlementByPlayer(sourcePlayer.getUUID());
-
                             if (settlement == null) {
-                                context.getSource().sendFailure(Component.literal("Ты не состоишь в поселении."));
-                                return 0;
+                                settlement = data.getSettlementByPlayer(target.getUUID());
                             }
 
-                            if (!settlement.isLeader(sourcePlayer.getUUID())) {
-                                context.getSource().sendFailure(Component.literal("Удалять жителей может только глава."));
+                            if (settlement == null) {
+                                context.getSource().sendFailure(Component.literal("Не удалось определить поселение. Укажи название поселения явно."));
                                 return 0;
                             }
 
                             SettlementService.removeMember(
                                     context.getSource().getServer(),
                                     settlement.getId(),
-                                    sourcePlayer.getUUID(),
                                     target.getUUID(),
                                     sourcePlayer.level().getGameTime()
                             );
 
+                            refreshCommandTrees(context.getSource().getServer(), sourcePlayer, target);
                             context.getSource().sendSuccess(
                                     () -> Component.literal("Игрок удален из поселения: " + target.getGameProfile().getName()),
                                     true
                             );
                             return 1;
-                        }));
-    }
-
-    private static LiteralArgumentBuilder<CommandSourceStack> buildTransferLeaderNode() {
-        return Commands.literal("transferleader")
+                        }))
                 .then(Commands.argument("settlement", StringArgumentType.string())
                         .suggests(SettlementDebugCommands::suggestSettlementNames)
                         .then(Commands.argument("player", EntityArgument.player())
                                 .executes(context -> {
-                                    CommandSourceStack source = context.getSource();
-                                    String settlementName = StringArgumentType.getString(context, "settlement");
+                                    ServerPlayer sourcePlayer = context.getSource().getPlayerOrException();
                                     ServerPlayer target = EntityArgument.getPlayer(context, "player");
+                                    Settlement settlement = requireSettlementByName(context, "settlement");
 
-                                    SettlementSavedData data = SettlementSavedData.get(source.getServer());
-                                    Settlement settlement = data.getSettlementByName(settlementName);
-
-                                    if (settlement == null) {
-                                        source.sendFailure(Component.literal("Поселение \"" + settlementName + "\" не найдено."));
-                                        return 0;
-                                    }
-
-                                    if (!settlement.isResident(target.getUUID())) {
-                                        source.sendFailure(Component.literal(
-                                                "Игрок " + target.getGameProfile().getName()
-                                                        + " не состоит в поселении " + settlement.getName() + "."
-                                        ));
-                                        return 0;
-                                    }
-
-                                    SettlementService.transferLeader(
-                                            source.getServer(),
+                                    SettlementService.removeMember(
+                                            context.getSource().getServer(),
                                             settlement.getId(),
                                             target.getUUID(),
-                                            source.getServer().overworld().getGameTime()
+                                            sourcePlayer.level().getGameTime()
                                     );
 
-                                    source.sendSuccess(
-                                            () -> Component.literal(
-                                                    "Глава поселения \"" + settlement.getName()
-                                                            + "\" передан игроку " + target.getGameProfile().getName() + "."
-                                            ),
+                                    refreshCommandTrees(context.getSource().getServer(), sourcePlayer, target);
+                                    context.getSource().sendSuccess(
+                                            () -> Component.literal("Игрок удален из поселения " + settlement.getName() + ": " + target.getGameProfile().getName()),
                                             true
                                     );
                                     return 1;
                                 })));
     }
 
-    private static LiteralArgumentBuilder<CommandSourceStack> buildGlobalPlotAccessNode() {
-        return Commands.literal("globalplotaccess")
-                .then(Commands.literal("grant")
-                        .then(Commands.argument("player", EntityArgument.player())
-                                .executes(context -> {
-                                    CommandSourceStack source = context.getSource();
-                                    ServerPlayer target = EntityArgument.getPlayer(context, "player");
+    private static void refreshCommandTrees(MinecraftServer server, ServerPlayer... players) {
+        if (server == null || players == null) {
+            return;
+        }
 
-                                    SettlementSavedData data = SettlementSavedData.get(source.getServer());
-                                    data.setGlobalPlotAccess(target.getUUID(), true);
+        for (ServerPlayer player : players) {
+            if (player == null) {
+                continue;
+            }
+            server.getCommands().sendCommands(player);
+        }
+    }
 
-                                    source.sendSuccess(
-                                            () -> Component.literal(
-                                                    "Игроку " + target.getGameProfile().getName()
-                                                            + " выдан полный доступ ко всем приватам всех поселений."
-                                            ),
-                                            true
-                                    );
-                                    return 1;
-                                })))
-                .then(Commands.literal("revoke")
-                        .then(Commands.argument("player", EntityArgument.player())
-                                .executes(context -> {
-                                    CommandSourceStack source = context.getSource();
-                                    ServerPlayer target = EntityArgument.getPlayer(context, "player");
-
-                                    SettlementSavedData data = SettlementSavedData.get(source.getServer());
-                                    data.setGlobalPlotAccess(target.getUUID(), false);
-
-                                    source.sendSuccess(
-                                            () -> Component.literal(
-                                                    "У игрока " + target.getGameProfile().getName()
-                                                            + " снят глобальный доступ ко всем приватам."
-                                            ),
-                                            true
-                                    );
-                                    return 1;
-                                })))
-                .then(Commands.literal("check")
-                        .then(Commands.argument("player", EntityArgument.player())
-                                .executes(context -> {
-                                    CommandSourceStack source = context.getSource();
-                                    ServerPlayer target = EntityArgument.getPlayer(context, "player");
-
-                                    SettlementSavedData data = SettlementSavedData.get(source.getServer());
-                                    boolean enabled = data.hasGlobalPlotAccess(target.getUUID());
-
-                                    source.sendSuccess(
-                                            () -> Component.literal(
-                                                    "Глобальный доступ игрока "
-                                                            + target.getGameProfile().getName()
-                                                            + ": " + (enabled ? "включен" : "выключен")
-                                            ),
-                                            false
-                                    );
-                                    return 1;
-                                })));
+    private static Settlement requireSettlementByName(CommandContext<CommandSourceStack> context, String argumentName) {
+        String settlementName = StringArgumentType.getString(context, argumentName);
+        SettlementSavedData data = SettlementSavedData.get(context.getSource().getServer());
+        Settlement settlement = data.getSettlementByName(settlementName);
+        if (settlement == null) {
+            throw new IllegalStateException("Поселение \"" + settlementName + "\" не найдено.");
+        }
+        return settlement;
     }
 
     private static CompletableFuture<Suggestions> suggestSettlementNames(
@@ -1720,6 +2006,189 @@ public final class SettlementDebugCommands {
         }
 
         return 1;
+    }
+
+
+    private static int makeLookedDoorPublic(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        ServerPlayer player = context.getSource().getPlayerOrException();
+        BlockPos pos = requireLookedBlock(player);
+
+        if (!isDoorLike(player, pos)) {
+            context.getSource().sendFailure(Component.literal("Нужно смотреть на дверь, люк или калитку."));
+            return 0;
+        }
+
+        SettlementSavedData data = SettlementSavedData.get(context.getSource().getServer());
+        if (data.getSettlementByChunk(player.level(), new ChunkPos(pos)) == null) {
+            context.getSource().sendFailure(Component.literal("Блок должен находиться на территории поселения."));
+            return 0;
+        }
+
+        data.setPublicDoor(player.level(), pos, true);
+        context.getSource().sendSuccess(() -> Component.literal("Дверь помечена как публичная: " + pos.toShortString()), true);
+        return 1;
+    }
+
+    private static int makeLookedDoorPrivate(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        ServerPlayer player = context.getSource().getPlayerOrException();
+        BlockPos pos = requireLookedBlock(player);
+
+        if (!isDoorLike(player, pos)) {
+            context.getSource().sendFailure(Component.literal("Нужно смотреть на дверь, люк или калитку."));
+            return 0;
+        }
+
+        SettlementSavedData data = SettlementSavedData.get(context.getSource().getServer());
+        data.setPublicDoor(player.level(), pos, false);
+        context.getSource().sendSuccess(() -> Component.literal("Публичный доступ к двери снят: " + pos.toShortString()), true);
+        return 1;
+    }
+
+    private static int showLookedDoorPublicInfo(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        ServerPlayer player = context.getSource().getPlayerOrException();
+        BlockPos pos = requireLookedBlock(player);
+
+        if (!isDoorLike(player, pos)) {
+            context.getSource().sendFailure(Component.literal("Нужно смотреть на дверь, люк или калитку."));
+            return 0;
+        }
+
+        SettlementSavedData data = SettlementSavedData.get(context.getSource().getServer());
+        boolean isPublic = data.isPublicDoor(player.level(), pos);
+        context.getSource().sendSuccess(() -> Component.literal("Дверь " + pos.toShortString() + ": " + (isPublic ? "публичная" : "обычная")), false);
+        return 1;
+    }
+
+    private static int makeLookedContainerPublic(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        ServerPlayer player = context.getSource().getPlayerOrException();
+        BlockPos pos = requireLookedBlock(player);
+
+        if (!isContainerLike(player, pos)) {
+            context.getSource().sendFailure(Component.literal("Нужно смотреть на контейнер."));
+            return 0;
+        }
+
+        SettlementSavedData data = SettlementSavedData.get(context.getSource().getServer());
+        if (data.getSettlementByChunk(player.level(), new ChunkPos(pos)) == null) {
+            context.getSource().sendFailure(Component.literal("Блок должен находиться на территории поселения."));
+            return 0;
+        }
+
+        data.setPublicContainer(player.level(), pos, true);
+        context.getSource().sendSuccess(() -> Component.literal("Контейнер помечен как публичный: " + pos.toShortString()), true);
+        return 1;
+    }
+
+    private static int makeLookedContainerPrivate(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        ServerPlayer player = context.getSource().getPlayerOrException();
+        BlockPos pos = requireLookedBlock(player);
+
+        if (!isContainerLike(player, pos)) {
+            context.getSource().sendFailure(Component.literal("Нужно смотреть на контейнер."));
+            return 0;
+        }
+
+        SettlementSavedData data = SettlementSavedData.get(context.getSource().getServer());
+        data.setPublicContainer(player.level(), pos, false);
+        context.getSource().sendSuccess(() -> Component.literal("Публичный доступ к контейнеру снят: " + pos.toShortString()), true);
+        return 1;
+    }
+
+    private static int showLookedContainerPublicInfo(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        ServerPlayer player = context.getSource().getPlayerOrException();
+        BlockPos pos = requireLookedBlock(player);
+
+        if (!isContainerLike(player, pos)) {
+            context.getSource().sendFailure(Component.literal("Нужно смотреть на контейнер."));
+            return 0;
+        }
+
+        SettlementSavedData data = SettlementSavedData.get(context.getSource().getServer());
+        boolean isPublic = data.isPublicContainer(player.level(), pos);
+        context.getSource().sendSuccess(() -> Component.literal("Контейнер " + pos.toShortString() + ": " + (isPublic ? "публичный" : "обычный")), false);
+        return 1;
+    }
+
+    private static int makeLookedDoorControlPublic(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        ServerPlayer player = context.getSource().getPlayerOrException();
+        BlockPos pos = requireLookedBlock(player);
+
+        if (!isDoorControlLike(player, pos)) {
+            context.getSource().sendFailure(Component.literal("Нужно смотреть на рычаг или кнопку."));
+            return 0;
+        }
+
+        SettlementSavedData data = SettlementSavedData.get(context.getSource().getServer());
+        if (data.getSettlementByChunk(player.level(), new ChunkPos(pos)) == null) {
+            context.getSource().sendFailure(Component.literal("Блок должен находиться на территории поселения."));
+            return 0;
+        }
+
+        data.setPublicDoorControl(player.level(), pos, true);
+        context.getSource().sendSuccess(() -> Component.literal("Рычаг/кнопка помечен(а) как публичный(ая): " + pos.toShortString()), true);
+        return 1;
+    }
+
+    private static int makeLookedDoorControlPrivate(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        ServerPlayer player = context.getSource().getPlayerOrException();
+        BlockPos pos = requireLookedBlock(player);
+
+        if (!isDoorControlLike(player, pos)) {
+            context.getSource().sendFailure(Component.literal("Нужно смотреть на рычаг или кнопку."));
+            return 0;
+        }
+
+        SettlementSavedData data = SettlementSavedData.get(context.getSource().getServer());
+        data.setPublicDoorControl(player.level(), pos, false);
+        context.getSource().sendSuccess(() -> Component.literal("Публичный доступ к рычагу/кнопке снят: " + pos.toShortString()), true);
+        return 1;
+    }
+
+    private static int showLookedDoorControlPublicInfo(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        ServerPlayer player = context.getSource().getPlayerOrException();
+        BlockPos pos = requireLookedBlock(player);
+
+        if (!isDoorControlLike(player, pos)) {
+            context.getSource().sendFailure(Component.literal("Нужно смотреть на рычаг или кнопку."));
+            return 0;
+        }
+
+        SettlementSavedData data = SettlementSavedData.get(context.getSource().getServer());
+        boolean isPublic = data.isPublicDoorControl(player.level(), pos);
+        context.getSource().sendSuccess(() -> Component.literal("Рычаг/кнопка " + pos.toShortString() + ": " + (isPublic ? "публичный(ая)" : "обычный(ая)")), false);
+        return 1;
+    }
+
+    private static BlockPos requireLookedBlock(ServerPlayer player) {
+        HitResult hitResult = player.pick(6.0D, 0.0F, false);
+        if (!(hitResult instanceof BlockHitResult) || hitResult.getType() != HitResult.Type.BLOCK) {
+            throw new IllegalStateException("Нужно смотреть на блок.");
+        }
+
+        return ((BlockHitResult) hitResult).getBlockPos();
+    }
+
+    private static boolean isDoorLike(ServerPlayer player, BlockPos pos) {
+        Block block = player.level().getBlockState(pos).getBlock();
+        return block instanceof DoorBlock || block instanceof TrapDoorBlock || block instanceof FenceGateBlock;
+    }
+
+    private static boolean isDoorControlLike(ServerPlayer player, BlockPos pos) {
+        Block block = player.level().getBlockState(pos).getBlock();
+        return block instanceof LeverBlock || block instanceof ButtonBlock;
+    }
+
+    private static boolean isContainerLike(ServerPlayer player, BlockPos pos) {
+        BlockEntity blockEntity = player.level().getBlockEntity(pos);
+        if (blockEntity == null) {
+            return false;
+        }
+
+        if (blockEntity instanceof MenuProvider) {
+            return true;
+        }
+
+        return blockEntity.getCapability(ForgeCapabilities.ITEM_HANDLER).isPresent();
     }
 
     private static int sendSettlementInfo(CommandSourceStack source, UUID playerUuid) {
