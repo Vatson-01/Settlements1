@@ -55,6 +55,7 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
     private Button treasuryDepositButton;
     private Button treasuryWithdrawButton;
     private Button treasuryDepositAllButton;
+    private Button plotMenuButton;
 
     private int warPage;
     private int reconstructionPage;
@@ -247,6 +248,10 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
                 .bounds(left + 280, top + 142, 72, 16)
                 .build();
 
+        plotMenuButton = Button.builder(Component.literal("Управление участком"), button -> pressButton(SettlementMenu.BUTTON_OPEN_PLOT_MENU))
+                .bounds(left + 140, top + 160, 212, 16)
+                .build();
+
         addRenderableWidget(personalDebtMinus1000Button);
         addRenderableWidget(personalDebtMinus100Button);
         addRenderableWidget(personalDebtMinus10Button);
@@ -269,6 +274,7 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         addRenderableWidget(treasuryDepositButton);
         addRenderableWidget(treasuryWithdrawButton);
         addRenderableWidget(treasuryDepositAllButton);
+        addRenderableWidget(plotMenuButton);
 
         updateButtons();
     }
@@ -452,6 +458,8 @@ public class SettlementScreen extends AbstractContainerScreen<SettlementMenu> {
         personalDebtPlus1000Button.active = overviewTab;
         personalDebtPayButton.active = overviewTab && menu.getPlayerDebt() > 0L;
         personalDebtPayAllButton.active = overviewTab && menu.getPlayerDebt() > 0L;
+        plotMenuButton.visible = overviewTab;
+        plotMenuButton.active = overviewTab && menu.canOpenPlotMenu();
 
         treasuryMinus1000Button.visible = treasuryTab;
         treasuryMinus100Button.visible = treasuryTab;

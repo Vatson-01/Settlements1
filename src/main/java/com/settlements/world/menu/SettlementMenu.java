@@ -6,11 +6,13 @@ import com.settlements.data.model.ReconstructionSession;
 import com.settlements.data.model.Settlement;
 import com.settlements.data.model.SettlementMember;
 import com.settlements.data.model.SettlementPermission;
+import com.settlements.data.model.SettlementPlot;
 import com.settlements.data.model.SiegeState;
 import com.settlements.data.model.WarRecord;
 import com.settlements.registry.ModMenuTypes;
 import com.settlements.service.ReconstructionRestoreResult;
 import com.settlements.service.ReconstructionService;
+import com.settlements.service.PlotMenuService;
 import com.settlements.service.TaxService;
 import com.settlements.service.TreasuryService;
 import com.mojang.authlib.GameProfile;
@@ -26,6 +28,7 @@ import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraftforge.network.NetworkHooks;
 
 import java.util.ArrayList;
@@ -46,6 +49,7 @@ public class SettlementMenu extends AbstractContainerMenu {
     public static final int BUTTON_OPEN_RECONSTRUCTION_STORAGE = 12;
     public static final int BUTTON_RESTORE_RECONSTRUCTION = 13;
     public static final int BUTTON_STOP_RECONSTRUCTION = 14;
+    public static final int BUTTON_OPEN_PLOT_MENU = 15;
 
     public static final int BUTTON_TREASURY_AMOUNT_MINUS_1000 = 100;
     public static final int BUTTON_TREASURY_AMOUNT_MINUS_100 = 101;
@@ -105,7 +109,8 @@ public class SettlementMenu extends AbstractContainerMenu {
     private static final int DATA_CAN_WITHDRAW_TREASURY = 30;
     private static final int DATA_PERSONAL_DEBT_ACTION_AMOUNT_WORD_0 = 31;
     private static final int DATA_PERSONAL_DEBT_ACTION_AMOUNT_WORD_1 = 32;
-    private static final int DATA_COUNT = 33;
+    private static final int DATA_CAN_OPEN_PLOT_MENU = 33;
+    private static final int DATA_COUNT = 34;
 
     private final UUID settlementId;
     private final String settlementName;
@@ -369,6 +374,28 @@ public class SettlementMenu extends AbstractContainerMenu {
                 return hasPermission(settlement, self, SettlementPermission.WITHDRAW_TREASURY);
             }
 
+            private boolean canOpenPlotMenu(Settlement settlement, SettlementMember self) {
+                if (settlement == null || !(playerInventory.player instanceof ServerPlayer)) {
+                    return false;
+                }
+
+                ServerPlayer serverPlayer = (ServerPlayer) playerInventory.player;
+                if (serverPlayer.hasPermissions(2) || settlement.isLeader(serverPlayer.getUUID())) {
+                    return true;
+                }
+
+                if (self != null && (self.getPermissionSet().has(SettlementPermission.VIEW_BOUNDARIES)
+                        || self.getPermissionSet().has(SettlementPermission.ASSIGN_PERSONAL_PLOTS)
+                        || self.getPermissionSet().has(SettlementPermission.ASSIGN_PUBLIC_PLOTS))) {
+                    return true;
+                }
+
+                SettlementPlot plot = SettlementSavedData.get(serverPlayer.server).getPlotByChunk(serverPlayer.level(), new ChunkPos(serverPlayer.blockPosition()));
+                return plot != null
+                        && settlement.getId().equals(plot.getSettlementId())
+                        && plot.isOwner(serverPlayer.getUUID());
+            }
+
             private long clampActionAmount(long value) {
                 if (value < 1L) {
                     return 1L;
@@ -554,6 +581,9 @@ public class SettlementMenu extends AbstractContainerMenu {
                 }
                 if (index == DATA_PERSONAL_DEBT_ACTION_AMOUNT_WORD_1) {
                     return getWord(personalDebtActionAmount, 1);
+                }
+                if (index == DATA_CAN_OPEN_PLOT_MENU) {
+                    return canOpenPlotMenu(settlement, self) ? 1 : 0;
                 }
 
                 return 0;
@@ -753,6 +783,10 @@ public class SettlementMenu extends AbstractContainerMenu {
         return readWords(menuData, DATA_PERSONAL_DEBT_ACTION_AMOUNT_WORD_0, 2);
     }
 
+    public boolean canOpenPlotMenu() {
+        return menuData.get(DATA_CAN_OPEN_PLOT_MENU) != 0;
+    }
+
     private void setTreasuryActionAmount(long amount) {
         menuData.set(DATA_TREASURY_ACTION_AMOUNT_WORD_0, getWord(amount, 0));
         menuData.set(DATA_TREASURY_ACTION_AMOUNT_WORD_1, getWord(amount, 1));
@@ -807,6 +841,21 @@ public class SettlementMenu extends AbstractContainerMenu {
             incrementPage();
             broadcastChanges();
             return true;
+        }
+
+        if (buttonId == BUTTON_OPEN_PLOT_MENU) {
+            if (!(player instanceof ServerPlayer)) {
+                return false;
+            }
+
+            ServerPlayer serverPlayer = (ServerPlayer) player;
+            try {
+                PlotMenuService.openCurrentChunkMenu(serverPlayer);
+                return true;
+            } catch (Exception ex) {
+                serverPlayer.displayClientMessage(Component.literal(messageOrDefault(ex, "Не удалось открыть меню участка.")), true);
+                return false;
+            }
         }
 
         if (!(player instanceof ServerPlayer)) {

@@ -8,8 +8,10 @@ import com.settlements.data.model.SettlementMember;
 import com.settlements.data.model.SettlementPermission;
 import com.settlements.data.model.SettlementPlot;
 import com.settlements.util.ClaimKeyUtil;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
 
 import java.util.UUID;
 
@@ -18,6 +20,13 @@ public final class PlotService {
     }
 
     public static void assignCurrentChunkToPlayer(ServerPlayer actor, ServerPlayer target) {
+        if (target == null) {
+            throw new IllegalStateException("Игрок не найден.");
+        }
+        assignChunkToPlayer(actor, target.getUUID(), actor.level().dimension(), new ChunkPos(actor.blockPosition()));
+    }
+
+    public static void assignChunkToPlayer(ServerPlayer actor, UUID targetUuid, ResourceKey<Level> dimension, ChunkPos chunkPos) {
         SettlementSavedData data = SettlementSavedData.get(actor.server);
         Settlement settlement = data.getSettlementByPlayer(actor.getUUID());
 
@@ -29,13 +38,11 @@ public final class PlotService {
             throw new IllegalStateException("Нет права на назначение личных участков.");
         }
 
-        if (!settlement.isResident(target.getUUID())) {
+        if (targetUuid == null || !settlement.isResident(targetUuid)) {
             throw new IllegalStateException("Игрок должен быть жителем этого поселения.");
         }
 
-        ChunkPos chunkPos = new ChunkPos(actor.blockPosition());
-        SettlementChunkClaim claim = data.getClaim(actor.level(), chunkPos);
-
+        SettlementChunkClaim claim = data.getClaim(dimension, chunkPos);
         if (claim == null) {
             throw new IllegalStateException("Текущий чанк не заклеймлен.");
         }
@@ -44,10 +51,10 @@ public final class PlotService {
             throw new IllegalStateException("Этот чанк принадлежит другому поселению.");
         }
 
-        String chunkKey = ClaimKeyUtil.toKey(actor.level().dimension(), chunkPos);
+        String chunkKey = ClaimKeyUtil.toKey(dimension, chunkPos);
         SettlementPlot existingPlotOnChunk = data.getPlotByChunkKey(chunkKey);
 
-        if (existingPlotOnChunk != null && existingPlotOnChunk.isOwner(target.getUUID())) {
+        if (existingPlotOnChunk != null && existingPlotOnChunk.isOwner(targetUuid)) {
             return;
         }
 
@@ -62,12 +69,16 @@ public final class PlotService {
             }
         }
 
-        SettlementPlot ownerPlot = data.getOrCreatePlotForOwner(settlement.getId(), target.getUUID(), gameTime);
+        SettlementPlot ownerPlot = data.getOrCreatePlotForOwner(settlement.getId(), targetUuid, gameTime);
         ownerPlot.addChunkKey(chunkKey, gameTime);
         data.saveOrUpdatePlot(ownerPlot);
     }
 
     public static void unassignCurrentChunk(ServerPlayer actor) {
+        unassignChunk(actor, actor.level().dimension(), new ChunkPos(actor.blockPosition()));
+    }
+
+    public static void unassignChunk(ServerPlayer actor, ResourceKey<Level> dimension, ChunkPos chunkPos) {
         SettlementSavedData data = SettlementSavedData.get(actor.server);
         Settlement settlement = data.getSettlementByPlayer(actor.getUUID());
 
@@ -79,8 +90,7 @@ public final class PlotService {
             throw new IllegalStateException("Нет права на перевод участков в общую территорию.");
         }
 
-        ChunkPos chunkPos = new ChunkPos(actor.blockPosition());
-        String chunkKey = ClaimKeyUtil.toKey(actor.level().dimension(), chunkPos);
+        String chunkKey = ClaimKeyUtil.toKey(dimension, chunkPos);
         SettlementPlot plot = data.getPlotByChunkKey(chunkKey);
 
         if (plot == null) {
@@ -101,18 +111,50 @@ public final class PlotService {
     }
 
     public static void grantPermissionOnCurrentPlot(ServerPlayer actor, ServerPlayer target, PlotPermission permission) {
-        SettlementPlot plot = getEditableCurrentPlot(actor);
-        plot.grantPermission(target.getUUID(), permission, actor.level().getGameTime());
-        SettlementSavedData.get(actor.server).saveOrUpdatePlot(plot);
+        if (target == null) {
+            throw new IllegalStateException("Игрок не найден.");
+        }
+        grantPermissionOnPlot(actor, target.getUUID(), permission, actor.level().dimension(), new ChunkPos(actor.blockPosition()));
     }
 
     public static void revokePermissionOnCurrentPlot(ServerPlayer actor, ServerPlayer target, PlotPermission permission) {
-        SettlementPlot plot = getEditableCurrentPlot(actor);
-        plot.revokePermission(target.getUUID(), permission, actor.level().getGameTime());
-        SettlementSavedData.get(actor.server).saveOrUpdatePlot(plot);
+        if (target == null) {
+            throw new IllegalStateException("Игрок не найден.");
+        }
+        revokePermissionOnPlot(actor, target.getUUID(), permission, actor.level().dimension(), new ChunkPos(actor.blockPosition()));
     }
 
-    private static SettlementPlot getEditableCurrentPlot(ServerPlayer actor) {
+    public static void grantPermissionOnPlot(ServerPlayer actor, UUID targetUuid, PlotPermission permission, ResourceKey<Level> dimension, ChunkPos chunkPos) {
+        if (targetUuid == null || permission == null) {
+            throw new IllegalStateException("Некорректные данные для выдачи доступа.");
+        }
+
+        SettlementSavedData data = SettlementSavedData.get(actor.server);
+        Settlement settlement = data.getSettlementByPlayer(actor.getUUID());
+        if (settlement == null) {
+            throw new IllegalStateException("Игрок не состоит в поселении.");
+        }
+        if (!settlement.isResident(targetUuid)) {
+            throw new IllegalStateException("Локальный доступ можно выдавать только жителям поселения.");
+        }
+
+        SettlementPlot plot = getEditablePlot(actor, dimension, chunkPos);
+        plot.grantPermission(targetUuid, permission, actor.level().getGameTime());
+        data.saveOrUpdatePlot(plot);
+    }
+
+    public static void revokePermissionOnPlot(ServerPlayer actor, UUID targetUuid, PlotPermission permission, ResourceKey<Level> dimension, ChunkPos chunkPos) {
+        if (targetUuid == null || permission == null) {
+            throw new IllegalStateException("Некорректные данные для снятия доступа.");
+        }
+
+        SettlementSavedData data = SettlementSavedData.get(actor.server);
+        SettlementPlot plot = getEditablePlot(actor, dimension, chunkPos);
+        plot.revokePermission(targetUuid, permission, actor.level().getGameTime());
+        data.saveOrUpdatePlot(plot);
+    }
+
+    private static SettlementPlot getEditablePlot(ServerPlayer actor, ResourceKey<Level> dimension, ChunkPos chunkPos) {
         SettlementSavedData data = SettlementSavedData.get(actor.server);
         Settlement settlement = data.getSettlementByPlayer(actor.getUUID());
 
@@ -120,8 +162,7 @@ public final class PlotService {
             throw new IllegalStateException("Игрок не состоит в поселении.");
         }
 
-        ChunkPos chunkPos = new ChunkPos(actor.blockPosition());
-        String chunkKey = ClaimKeyUtil.toKey(actor.level().dimension(), chunkPos);
+        String chunkKey = ClaimKeyUtil.toKey(dimension, chunkPos);
         SettlementPlot plot = data.getPlotByChunkKey(chunkKey);
 
         if (plot == null) {
@@ -132,7 +173,9 @@ public final class PlotService {
             throw new IllegalStateException("Этот участок принадлежит другому поселению.");
         }
 
-        if (settlement.isLeader(actor.getUUID()) || plot.isOwner(actor.getUUID()) || hasSettlementPermission(settlement, actor, SettlementPermission.ASSIGN_PERSONAL_PLOTS)) {
+        if (settlement.isLeader(actor.getUUID())
+                || plot.isOwner(actor.getUUID())
+                || hasSettlementPermission(settlement, actor, SettlementPermission.ASSIGN_PERSONAL_PLOTS)) {
             return plot;
         }
 

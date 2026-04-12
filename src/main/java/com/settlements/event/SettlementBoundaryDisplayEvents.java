@@ -26,8 +26,10 @@ public final class SettlementBoundaryDisplayEvents {
     private static final String NBT_LAST_CHUNK_X = "settlementsBoundaryLastChunkX";
     private static final String NBT_LAST_CHUNK_Z = "settlementsBoundaryLastChunkZ";
     private static final String NBT_LAST_SETTLEMENT_ID = "settlementsBoundaryLastSettlementId";
+    private static final String NBT_LAST_TRANSITION_TITLE_TICK = "settlementsBoundaryLastTransitionTitleTick";
 
     private static final int PARTICLE_INTERVAL_TICKS = 10;
+    private static final int TRANSITION_TITLE_COOLDOWN_TICKS = 500;
     private static final int RENDER_RADIUS_CHUNKS = 2;
 
     private static final DustParticleOptions OWN_SETTLEMENT_PARTICLE = new DustParticleOptions(new Vector3f(0.20F, 0.95F, 0.20F), 1.0F);
@@ -122,12 +124,17 @@ public final class SettlementBoundaryDisplayEvents {
     }
 
     private static void sendSettlementTransitionTitle(ServerPlayer player, Settlement previousSettlement, Settlement currentSettlement) {
+        if (!canSendTransitionTitle(player)) {
+            return;
+        }
+
         if (currentSettlement != null) {
             sendTitle(
                     player,
                     Component.literal("Территория поселения"),
                     Component.literal("Вы на территории поселения \"" + currentSettlement.getName() + "\"")
             );
+            markTransitionTitleSent(player);
             return;
         }
 
@@ -137,7 +144,19 @@ public final class SettlementBoundaryDisplayEvents {
                     Component.literal("Нейтральная территория"),
                     Component.literal("Вы покинули поселение \"" + previousSettlement.getName() + "\"")
             );
+            markTransitionTitleSent(player);
         }
+    }
+
+    private static boolean canSendTransitionTitle(ServerPlayer player) {
+        net.minecraft.nbt.CompoundTag persistentData = player.getPersistentData();
+        long currentGameTime = player.level().getGameTime();
+        long lastTitleTick = persistentData.getLong(NBT_LAST_TRANSITION_TITLE_TICK);
+        return currentGameTime - lastTitleTick >= TRANSITION_TITLE_COOLDOWN_TICKS;
+    }
+
+    private static void markTransitionTitleSent(ServerPlayer player) {
+        player.getPersistentData().putLong(NBT_LAST_TRANSITION_TITLE_TICK, player.level().getGameTime());
     }
 
     private static void sendTitle(ServerPlayer player, Component title, Component subtitle) {
