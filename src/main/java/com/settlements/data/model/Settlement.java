@@ -28,6 +28,16 @@ public class Settlement {
     private final SettlementTaxConfig taxConfig;
 
     private int purchasedChunkAllowance;
+    private long claimPriceBaseOffset;
+    private long claimPriceStepOffset;
+    private double claimPriceMultiplier;
+    private int paidClaimCount;
+
+    private SettlementType type;
+    private boolean adminWarEligible;
+    private boolean globalOpenDoors;
+    private boolean globalOpenContainers;
+    private boolean globalUseRedstone;
 
     private long createdAt;
     private long updatedAt;
@@ -41,7 +51,16 @@ public class Settlement {
         this.treasuryBalance = 0L;
         this.settlementDebt = 0L;
         this.taxConfig = new SettlementTaxConfig();
-        this.purchasedChunkAllowance = 4;
+        this.purchasedChunkAllowance = 0;
+        this.claimPriceBaseOffset = 0L;
+        this.claimPriceStepOffset = 0L;
+        this.claimPriceMultiplier = 1.0D;
+        this.paidClaimCount = 0;
+        this.type = SettlementType.NORMAL;
+        this.adminWarEligible = false;
+        this.globalOpenDoors = false;
+        this.globalOpenContainers = false;
+        this.globalUseRedstone = false;
         this.createdAt = createdAt;
         this.updatedAt = createdAt;
     }
@@ -49,6 +68,15 @@ public class Settlement {
     public static Settlement createNew(String name, UUID leaderUuid, long gameTime) {
         Settlement settlement = new Settlement(UUID.randomUUID(), name, leaderUuid, gameTime);
         settlement.members.put(leaderUuid, new SettlementMember(leaderUuid, true, gameTime));
+        return settlement;
+    }
+    public static Settlement createAdminLocation(String name, UUID creatorUuid, long gameTime) {
+        Settlement settlement = new Settlement(UUID.randomUUID(), name, creatorUuid, gameTime);
+        settlement.type = SettlementType.ADMIN;
+        settlement.adminWarEligible = false;
+        settlement.globalOpenDoors = true;
+        settlement.globalOpenContainers = false;
+        settlement.globalUseRedstone = true;
         return settlement;
     }
 
@@ -97,6 +125,9 @@ public class Settlement {
     }
 
     public int getClaimLimitByResidents() {
+        if (type == SettlementType.ADMIN) {
+            return Integer.MAX_VALUE;
+        }
         return members.size() * CLAIMED_CHUNKS_PER_MEMBER;
     }
 
@@ -217,7 +248,98 @@ public class Settlement {
         this.purchasedChunkAllowance = Math.max(0, purchasedChunkAllowance);
         touch(gameTime);
     }
+    public long getClaimPriceBaseOffset() {
+        return claimPriceBaseOffset;
+    }
 
+    public void setClaimPriceBaseOffset(long claimPriceBaseOffset, long gameTime) {
+        this.claimPriceBaseOffset = claimPriceBaseOffset;
+        touch(gameTime);
+    }
+
+    public long getClaimPriceStepOffset() {
+        return claimPriceStepOffset;
+    }
+
+    public void setClaimPriceStepOffset(long claimPriceStepOffset, long gameTime) {
+        this.claimPriceStepOffset = claimPriceStepOffset;
+        touch(gameTime);
+    }
+
+    public double getClaimPriceMultiplier() {
+        return claimPriceMultiplier;
+    }
+
+    public void setClaimPriceMultiplier(double claimPriceMultiplier, long gameTime) {
+        this.claimPriceMultiplier = claimPriceMultiplier <= 0.0D ? 1.0D : claimPriceMultiplier;
+        touch(gameTime);
+    }
+
+    public int getPaidClaimCount() {
+        return paidClaimCount;
+    }
+
+    public void setPaidClaimCount(int paidClaimCount, long gameTime) {
+        this.paidClaimCount = Math.max(0, paidClaimCount);
+        touch(gameTime);
+    }
+
+    public void incrementPaidClaimCount(long gameTime) {
+        this.paidClaimCount++;
+        touch(gameTime);
+    }
+    public SettlementType getType() {
+        return type;
+    }
+
+    public void setType(SettlementType type, long gameTime) {
+        this.type = type == null ? SettlementType.NORMAL : type;
+        touch(gameTime);
+    }
+
+    public boolean isAdminLocation() {
+        return type == SettlementType.ADMIN;
+    }
+
+    public boolean isWarEligible() {
+        return type != SettlementType.ADMIN || adminWarEligible;
+    }
+
+    public boolean isAdminWarEligible() {
+        return adminWarEligible;
+    }
+
+    public void setAdminWarEligible(boolean adminWarEligible, long gameTime) {
+        this.adminWarEligible = adminWarEligible;
+        touch(gameTime);
+    }
+
+    public boolean isGlobalOpenDoors() {
+        return globalOpenDoors;
+    }
+
+    public void setGlobalOpenDoors(boolean globalOpenDoors, long gameTime) {
+        this.globalOpenDoors = globalOpenDoors;
+        touch(gameTime);
+    }
+
+    public boolean isGlobalOpenContainers() {
+        return globalOpenContainers;
+    }
+
+    public void setGlobalOpenContainers(boolean globalOpenContainers, long gameTime) {
+        this.globalOpenContainers = globalOpenContainers;
+        touch(gameTime);
+    }
+
+    public boolean isGlobalUseRedstone() {
+        return globalUseRedstone;
+    }
+
+    public void setGlobalUseRedstone(boolean globalUseRedstone, long gameTime) {
+        this.globalUseRedstone = globalUseRedstone;
+        touch(gameTime);
+    }
     public void addClaimedChunkKey(String chunkKey, long gameTime) {
         if (claimedChunkKeys.add(chunkKey)) {
             touch(gameTime);
@@ -244,6 +366,15 @@ public class Settlement {
         tag.putLong("SettlementDebt", settlementDebt);
         tag.put("TaxConfig", taxConfig.save());
         tag.putInt("PurchasedChunkAllowance", purchasedChunkAllowance);
+        tag.putLong("ClaimPriceBaseOffset", claimPriceBaseOffset);
+        tag.putLong("ClaimPriceStepOffset", claimPriceStepOffset);
+        tag.putDouble("ClaimPriceMultiplier", claimPriceMultiplier);
+        tag.putInt("PaidClaimCount", paidClaimCount);
+        tag.putString("Type", type.name());
+        tag.putBoolean("AdminWarEligible", adminWarEligible);
+        tag.putBoolean("GlobalOpenDoors", globalOpenDoors);
+        tag.putBoolean("GlobalOpenContainers", globalOpenContainers);
+        tag.putBoolean("GlobalUseRedstone", globalUseRedstone);
         tag.putLong("CreatedAt", createdAt);
         tag.putLong("UpdatedAt", updatedAt);
 
@@ -271,7 +402,18 @@ public class Settlement {
         Settlement settlement = new Settlement(id, name, leaderUuid, createdAt);
         settlement.treasuryBalance = tag.getLong("TreasuryBalance");
         settlement.settlementDebt = tag.getLong("SettlementDebt");
-        settlement.purchasedChunkAllowance = tag.contains("PurchasedChunkAllowance") ? tag.getInt("PurchasedChunkAllowance") : 4;
+        settlement.purchasedChunkAllowance = tag.contains("PurchasedChunkAllowance") ? tag.getInt("PurchasedChunkAllowance") : 0;
+        settlement.claimPriceBaseOffset = tag.contains("ClaimPriceBaseOffset") ? tag.getLong("ClaimPriceBaseOffset") : 0L;
+        settlement.claimPriceStepOffset = tag.contains("ClaimPriceStepOffset") ? tag.getLong("ClaimPriceStepOffset") : 0L;
+        settlement.claimPriceMultiplier = tag.contains("ClaimPriceMultiplier") ? tag.getDouble("ClaimPriceMultiplier") : 1.0D;
+        settlement.paidClaimCount = tag.contains("PaidClaimCount") ? tag.getInt("PaidClaimCount") : 0;
+        settlement.type = tag.contains("Type", Tag.TAG_STRING)
+                ? SettlementType.fromSerializedName(tag.getString("Type"))
+                : SettlementType.NORMAL;
+        settlement.adminWarEligible = tag.getBoolean("AdminWarEligible");
+        settlement.globalOpenDoors = tag.getBoolean("GlobalOpenDoors");
+        settlement.globalOpenContainers = tag.getBoolean("GlobalOpenContainers");
+        settlement.globalUseRedstone = tag.getBoolean("GlobalUseRedstone");
         settlement.updatedAt = tag.getLong("UpdatedAt");
 
         if (tag.contains("TaxConfig")) {
@@ -293,7 +435,7 @@ public class Settlement {
             }
         }
 
-        if (!settlement.members.containsKey(leaderUuid)) {
+        if (settlement.type != SettlementType.ADMIN && !settlement.members.containsKey(leaderUuid)) {
             settlement.members.put(leaderUuid, new SettlementMember(leaderUuid, true, createdAt));
         }
 

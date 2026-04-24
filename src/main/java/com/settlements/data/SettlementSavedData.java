@@ -70,6 +70,7 @@ public class SettlementSavedData extends SavedData {
 
     private final Set<UUID> globalPlotAccessPlayerUuids = new LinkedHashSet<UUID>();
     private final Set<UUID> settlementCreateAccessPlayerUuids = new LinkedHashSet<UUID>();
+    private final Set<UUID> settlementFreeClaimAccessPlayerUuids = new LinkedHashSet<UUID>();
     private final Set<String> publicDoorKeys = new LinkedHashSet<String>();
     private final Set<String> publicDoorControlKeys = new LinkedHashSet<String>();
     private final Set<String> publicContainerKeys = new LinkedHashSet<String>();
@@ -209,7 +210,16 @@ public class SettlementSavedData extends SavedData {
                 }
             }
         }
-
+        if (tag.contains("SettlementFreeClaimAccessPlayers", Tag.TAG_LIST)) {
+            ListTag freeClaimAccessList = tag.getList("SettlementFreeClaimAccessPlayers", Tag.TAG_STRING);
+            for (int i = 0; i < freeClaimAccessList.size(); i++) {
+                String rawUuid = freeClaimAccessList.getString(i);
+                try {
+                    data.settlementFreeClaimAccessPlayerUuids.add(UUID.fromString(rawUuid));
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+        }
         if (tag.contains("PublicDoorKeys", Tag.TAG_LIST)) {
             ListTag publicDoorList = tag.getList("PublicDoorKeys", Tag.TAG_STRING);
             for (int i = 0; i < publicDoorList.size(); i++) {
@@ -326,6 +336,12 @@ public class SettlementSavedData extends SavedData {
             settlementCreateAccessTag.add(StringTag.valueOf(playerUuid.toString()));
         }
         tag.put("SettlementCreateAccessPlayers", settlementCreateAccessTag);
+
+        ListTag settlementFreeClaimAccessTag = new ListTag();
+        for (UUID playerUuid : settlementFreeClaimAccessPlayerUuids) {
+            settlementFreeClaimAccessTag.add(StringTag.valueOf(playerUuid.toString()));
+        }
+        tag.put("SettlementFreeClaimAccessPlayers", settlementFreeClaimAccessTag);
 
         ListTag publicDoorTag = new ListTag();
         for (String key : publicDoorKeys) {
@@ -525,6 +541,38 @@ public class SettlementSavedData extends SavedData {
         return Collections.unmodifiableSet(settlementCreateAccessPlayerUuids);
     }
 
+    public boolean hasSettlementFreeClaimAccess(UUID playerUuid) {
+        return playerUuid != null && settlementFreeClaimAccessPlayerUuids.contains(playerUuid);
+    }
+
+    public void setSettlementFreeClaimAccess(UUID playerUuid, boolean enabled) {
+        if (playerUuid == null) {
+            return;
+        }
+
+        if (enabled) {
+            settlementFreeClaimAccessPlayerUuids.add(playerUuid);
+        } else {
+            settlementFreeClaimAccessPlayerUuids.remove(playerUuid);
+        }
+        setDirty();
+    }
+
+    public boolean consumeSettlementFreeClaimAccess(UUID playerUuid) {
+        if (playerUuid == null) {
+            return false;
+        }
+
+        boolean removed = settlementFreeClaimAccessPlayerUuids.remove(playerUuid);
+        if (removed) {
+            setDirty();
+        }
+        return removed;
+    }
+
+    public Collection<UUID> getSettlementFreeClaimAccessPlayers() {
+        return Collections.unmodifiableSet(settlementFreeClaimAccessPlayerUuids);
+    }
 
     public boolean isPublicDoor(Level level, BlockPos pos) {
         return isPublicKey(publicDoorKeys, level, pos, resolveDoorObjectPositions(level, pos));

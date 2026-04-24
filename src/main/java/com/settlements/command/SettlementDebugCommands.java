@@ -2,6 +2,7 @@ package com.settlements.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.LongArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
@@ -29,6 +30,7 @@ import com.settlements.service.CurrencyService;
 import com.settlements.service.PlotService;
 import com.settlements.service.ReconstructionRestoreResult;
 import com.settlements.service.ReconstructionService;
+import com.settlements.data.model.SettlementChunkClaim;
 import com.settlements.service.SettlementMenuService;
 import com.settlements.service.SettlementService;
 import com.settlements.service.ShopService;
@@ -87,11 +89,13 @@ public final class SettlementDebugCommands {
                         .then(buildMoneyNode())
                         .then(buildTreasuryNode())
                         .then(buildTaxNode())
+                        .then(buildAdminLocationNode())
                         .then(buildCreateNode())
                         .then(buildInfoNode())
                         .then(buildWhereNode())
                         .then(buildClaimNode())
                         .then(buildUnclaimNode())
+                        .then(buildClaimPriceNode())
                         .then(buildSetAllowanceNode())
                         .then(buildPlotNode())
                         .then(buildShopNode())
@@ -245,6 +249,12 @@ public final class SettlementDebugCommands {
         sendHelpLine(source, "/settlementdebug claim [settlement] - заклеймить текущий чанк");
         sendHelpLine(source, "/settlementdebug unclaim - снять клейм с текущего чанка");
         sendHelpLine(source, "/settlementdebug setallowance <amount> [settlement] - задать лимит купленных чанков");
+        sendHelpLine(source, "/settlementdebug claimprice info [settlement] - показать цену следующего слота чанка");
+        sendHelpLine(source, "/settlementdebug claimprice setbaseoffset <value> [settlement] - изменить базовую цену для поселения");
+        sendHelpLine(source, "/settlementdebug claimprice setstepoffset <value> [settlement] - изменить рост цены для поселения");
+        sendHelpLine(source, "/settlementdebug claimprice setmultiplier <value> [settlement] - изменить множитель цены для поселения");
+        sendHelpLine(source, "/settlementdebug claimprice settier <value> [settlement] - вручную задать tier роста цены");
+        sendHelpLine(source, "/settlementdebug claimprice reset [settlement] - сбросить настройки цены поселения");
         return 1;
     }
 
@@ -270,12 +280,25 @@ public final class SettlementDebugCommands {
     private static int sendDebugHelpAdmin(CommandSourceStack source) {
         sendHelpHeader(source, "Help: admin");
         sendHelpLine(source, "/settlementdebug create <name> - создать поселение");
+        sendHelpLine(source, "/settlementdebug adminlocation create <name> - создать admin-локацию");
+        sendHelpLine(source, "/settlementdebug adminlocation info <name> - показать флаги и параметры admin-локации");
+        sendHelpLine(source, "/settlementdebug adminlocation list - список admin-локаций");
+        sendHelpLine(source, "/settlementdebug adminlocation where - показать, какая admin-локация на текущем чанке");
+        sendHelpLine(source, "/settlementdebug adminlocation claim <name> - заклеймить текущий чанк за admin-локацией");
+        sendHelpLine(source, "/settlementdebug adminlocation unclaim - снять клейм с текущего чанка, если он принадлежит admin-локации");
+        sendHelpLine(source, "/settlementdebug adminlocation plot assign <player> - назначить текущий чанк личным участком игрока");
+        sendHelpLine(source, "/settlementdebug adminlocation plot unassign - вернуть текущий чанк в общую территорию");
+        sendHelpLine(source, "/settlementdebug adminlocation plot grant <player> <permission> - выдать локальное право на текущем участке admin-локации");
+        sendHelpLine(source, "/settlementdebug adminlocation plot revoke <player> <permission> - снять локальное право на текущем участке admin-локации");
+        sendHelpLine(source, "/settlementdebug adminlocation plot info - показать plot на текущем чанке");
+        sendHelpLine(source, "/settlementdebug adminlocation flag doors|containers|redstone on|off <name> - глобальные флаги локации");
+        sendHelpLine(source, "/settlementdebug adminlocation wareligible on|off <name> - участие admin-локации в войнах");
         sendHelpLine(source, "/settlementdebug info [player] - показать информацию о поселении игрока");
         sendHelpLine(source, "/settlementdebug disband [settlement] - распустить поселение");
         sendHelpLine(source, "/settlementdebug money - посмотреть монеты у себя");
         sendHelpLine(source, "/settlementdebug globalplotaccess grant|revoke|check <player> - глобальный доступ ко всем приватам");
         sendHelpLine(source, "/settlementdebug globalplotaccess list - список игроков с глобальным доступом");
-        sendHelpLine(source, "/settlementdebug createaccess grant|revoke|check <player> - право на создание поселения");
+        sendHelpLine(source, "/settlementdebug createaccess grant|revoke|check <player> - право на создание поселения и бесплатный первый чанк");
         sendHelpLine(source, "/settlementdebug createaccess list - список игроков с правом на создание поселения");
         sendHelpLine(source, "/settlementdebug transferleader <settlement> <player> - передать главу поселения");
         sendHelpLine(source, "Все команды settlementdebug доступны только OP.");
@@ -399,12 +422,13 @@ public final class SettlementDebugCommands {
 
                                     SettlementSavedData data = SettlementSavedData.get(source.getServer());
                                     data.setSettlementCreateAccess(target.getUUID(), true);
+                                    data.setSettlementFreeClaimAccess(target.getUUID(), true);
                                     refreshCommandTrees(source.getServer(), target);
 
                                     source.sendSuccess(
                                             () -> Component.literal(
                                                     "Игроку " + target.getGameProfile().getName()
-                                                            + " выдано право на создание поселения."
+                                                            + " выдано право на создание поселения и бесплатный первый чанк."
                                             ),
                                             true
                                     );
@@ -418,12 +442,13 @@ public final class SettlementDebugCommands {
 
                                     SettlementSavedData data = SettlementSavedData.get(source.getServer());
                                     data.setSettlementCreateAccess(target.getUUID(), false);
+                                    data.setSettlementFreeClaimAccess(target.getUUID(), false);
                                     refreshCommandTrees(source.getServer(), target);
 
                                     source.sendSuccess(
                                             () -> Component.literal(
                                                     "У игрока " + target.getGameProfile().getName()
-                                                            + " снято право на создание поселения."
+                                                            + " снято право на создание поселения и бесплатный первый чанк."
                                             ),
                                             true
                                     );
@@ -436,13 +461,15 @@ public final class SettlementDebugCommands {
                                     ServerPlayer target = EntityArgument.getPlayer(context, "player");
 
                                     SettlementSavedData data = SettlementSavedData.get(source.getServer());
-                                    boolean enabled = data.hasSettlementCreateAccess(target.getUUID());
+                                    boolean createEnabled = data.hasSettlementCreateAccess(target.getUUID());
+                                    boolean freeClaimEnabled = data.hasSettlementFreeClaimAccess(target.getUUID());
 
                                     source.sendSuccess(
                                             () -> Component.literal(
-                                                    "Право на создание поселения у игрока "
+                                                    "Create access у игрока "
                                                             + target.getGameProfile().getName()
-                                                            + ": " + (enabled ? "включено" : "выключено")
+                                                            + ": " + (createEnabled ? "включен" : "выключен")
+                                                            + "; free first claim: " + (freeClaimEnabled ? "включен" : "выключен")
                                             ),
                                             false
                                     );
@@ -1369,7 +1396,498 @@ public final class SettlementDebugCommands {
         SettlementSavedData.get(source.getServer()).markChanged();
         return total;
     }
+    private static LiteralArgumentBuilder<CommandSourceStack> buildAdminLocationNode() {
+        return Commands.literal("adminlocation")
+                .then(Commands.literal("create")
+                        .then(Commands.argument("name", StringArgumentType.greedyString())
+                                .executes(context -> createAdminLocation(context))))
+                .then(Commands.literal("info")
+                        .then(Commands.argument("settlement", StringArgumentType.greedyString())
+                                .suggests(SettlementDebugCommands::suggestAdminLocationNames)
+                                .executes(context -> showAdminLocationInfo(context))))
+                .then(Commands.literal("list")
+                        .executes(SettlementDebugCommands::listAdminLocations))
+                .then(Commands.literal("where")
+                        .executes(SettlementDebugCommands::showCurrentAdminLocation))
+                .then(Commands.literal("claim")
+                        .then(Commands.argument("settlement", StringArgumentType.greedyString())
+                                .suggests(SettlementDebugCommands::suggestAdminLocationNames)
+                                .executes(SettlementDebugCommands::claimCurrentChunkForAdminLocation)))
+                .then(Commands.literal("unclaim")
+                        .executes(SettlementDebugCommands::unclaimCurrentChunkForAdminLocation))
+                .then(Commands.literal("plot")
+                        .then(Commands.literal("assign")
+                                .then(Commands.argument("player", EntityArgument.player())
+                                        .executes(SettlementDebugCommands::assignCurrentChunkToPlayerInAdminLocation)))
+                        .then(Commands.literal("unassign")
+                                .executes(SettlementDebugCommands::unassignCurrentChunkInAdminLocation))
+                        .then(Commands.literal("grant")
+                                .then(Commands.argument("player", EntityArgument.player())
+                                        .then(Commands.argument("permission", StringArgumentType.word())
+                                                .suggests((context, builder) ->
+                                                        SharedSuggestionProvider.suggest(
+                                                                Stream.of(PlotPermission.values()).map(permission -> permission.name().toLowerCase(Locale.ROOT)),
+                                                                builder
+                                                        ))
+                                                .executes(SettlementDebugCommands::grantPermissionOnCurrentAdminLocationPlot))))
+                        .then(Commands.literal("revoke")
+                                .then(Commands.argument("player", EntityArgument.player())
+                                        .then(Commands.argument("permission", StringArgumentType.word())
+                                                .suggests((context, builder) ->
+                                                        SharedSuggestionProvider.suggest(
+                                                                Stream.of(PlotPermission.values()).map(permission -> permission.name().toLowerCase(Locale.ROOT)),
+                                                                builder
+                                                        ))
+                                                .executes(SettlementDebugCommands::revokePermissionOnCurrentAdminLocationPlot))))
+                        .then(Commands.literal("info")
+                                .executes(SettlementDebugCommands::showCurrentAdminLocationPlotInfo)))
+                .then(Commands.literal("flag")
+                        .then(Commands.literal("doors")
+                                .then(Commands.literal("on")
+                                        .then(Commands.argument("settlement", StringArgumentType.greedyString())
+                                                .suggests(SettlementDebugCommands::suggestAdminLocationNames)
+                                                .executes(context -> setAdminLocationFlag(context, "doors", true))))
+                                .then(Commands.literal("off")
+                                        .then(Commands.argument("settlement", StringArgumentType.greedyString())
+                                                .suggests(SettlementDebugCommands::suggestAdminLocationNames)
+                                                .executes(context -> setAdminLocationFlag(context, "doors", false)))))
+                        .then(Commands.literal("containers")
+                                .then(Commands.literal("on")
+                                        .then(Commands.argument("settlement", StringArgumentType.greedyString())
+                                                .suggests(SettlementDebugCommands::suggestAdminLocationNames)
+                                                .executes(context -> setAdminLocationFlag(context, "containers", true))))
+                                .then(Commands.literal("off")
+                                        .then(Commands.argument("settlement", StringArgumentType.greedyString())
+                                                .suggests(SettlementDebugCommands::suggestAdminLocationNames)
+                                                .executes(context -> setAdminLocationFlag(context, "containers", false)))))
+                        .then(Commands.literal("redstone")
+                                .then(Commands.literal("on")
+                                        .then(Commands.argument("settlement", StringArgumentType.greedyString())
+                                                .suggests(SettlementDebugCommands::suggestAdminLocationNames)
+                                                .executes(context -> setAdminLocationFlag(context, "redstone", true))))
+                                .then(Commands.literal("off")
+                                        .then(Commands.argument("settlement", StringArgumentType.greedyString())
+                                                .suggests(SettlementDebugCommands::suggestAdminLocationNames)
+                                                .executes(context -> setAdminLocationFlag(context, "redstone", false))))))
+                .then(Commands.literal("wareligible")
+                        .then(Commands.literal("on")
+                                .then(Commands.argument("settlement", StringArgumentType.greedyString())
+                                        .suggests(SettlementDebugCommands::suggestAdminLocationNames)
+                                        .executes(context -> setAdminLocationWarEligible(context, true))))
+                        .then(Commands.literal("off")
+                                .then(Commands.argument("settlement", StringArgumentType.greedyString())
+                                        .suggests(SettlementDebugCommands::suggestAdminLocationNames)
+                                        .executes(context -> setAdminLocationWarEligible(context, false)))));
+    }
 
+    private static int createAdminLocation(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer actor = source.getPlayerOrException();
+        SettlementSavedData data = SettlementSavedData.get(source.getServer());
+
+        String rawName = StringArgumentType.getString(context, "name");
+        String normalizedName = normalizeSettlementNameInput(rawName);
+        if (normalizedName.isEmpty()) {
+            source.sendFailure(Component.literal("Название локации не может быть пустым."));
+            return 0;
+        }
+
+        if (findSettlementByNormalizedName(data, normalizedName) != null) {
+            source.sendFailure(Component.literal("Поселение или локация с таким названием уже существует."));
+            return 0;
+        }
+
+        Settlement settlement = Settlement.createAdminLocation(
+                normalizedName,
+                actor.getUUID(),
+                actor.level().getGameTime()
+        );
+        data.addSettlement(settlement);
+
+        source.sendSuccess(
+                () -> Component.literal("Создана admin-локация: " + settlement.getName()),
+                true
+        );
+        return 1;
+    }
+
+    private static int showAdminLocationInfo(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayerOrException();
+        Settlement settlement = requireAdminLocationByName(context, "settlement");
+        SettlementSavedData data = SettlementSavedData.get(source.getServer());
+        ChunkPos currentChunk = new ChunkPos(player.blockPosition());
+        Settlement currentSettlement = data.getSettlementByChunk(player.level(), currentChunk);
+
+        source.sendSuccess(() -> Component.literal("==== Admin location ===="), false);
+        source.sendSuccess(() -> Component.literal("Название: " + settlement.getName()), false);
+        source.sendSuccess(() -> Component.literal("Тип: " + settlement.getType().name()), false);
+        source.sendSuccess(() -> Component.literal("Клеймов: " + settlement.getClaimedChunkCount()), false);
+        source.sendSuccess(() -> Component.literal("Купленный лимит чанков: " + settlement.getPurchasedChunkAllowance()), false);
+        source.sendSuccess(() -> Component.literal("Оплачено слотов чанков: " + settlement.getPaidClaimCount()), false);
+        source.sendSuccess(() -> Component.literal("Цена следующего слота чанка: " + ClaimService.calculateNextClaimPrice(settlement)), false);
+        source.sendSuccess(() -> Component.literal("Doors: " + (settlement.isGlobalOpenDoors() ? "ON" : "OFF")), false);
+        source.sendSuccess(() -> Component.literal("Containers: " + (settlement.isGlobalOpenContainers() ? "ON" : "OFF")), false);
+        source.sendSuccess(() -> Component.literal("Redstone: " + (settlement.isGlobalUseRedstone() ? "ON" : "OFF")), false);
+        source.sendSuccess(() -> Component.literal("War eligible: " + (settlement.isAdminWarEligible() ? "ON" : "OFF")), false);
+
+        if (currentSettlement != null && currentSettlement.getId().equals(settlement.getId())) {
+            source.sendSuccess(() -> Component.literal("Ты сейчас стоишь внутри этой admin-локации."), false);
+            source.sendSuccess(() -> Component.literal("Текущий чанк: " + currentChunk.x + ", " + currentChunk.z), false);
+
+            SettlementPlot plot = data.getPlotByChunk(player.level(), currentChunk);
+            if (plot == null) {
+                source.sendSuccess(() -> Component.literal("На текущем чанке нет личного участка."), false);
+            } else {
+                source.sendSuccess(() -> Component.literal("Текущий chunk является личным участком."), false);
+                source.sendSuccess(() -> Component.literal("Plot ID: " + plot.getId()), false);
+                source.sendSuccess(() -> Component.literal("Владелец: " + plot.getOwnerUuid()), false);
+            }
+        }
+
+        return 1;
+    }
+
+    private static int listAdminLocations(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        SettlementSavedData data = SettlementSavedData.get(source.getServer());
+
+        java.util.List<Settlement> adminLocations = new java.util.ArrayList<Settlement>();
+        for (Settlement settlement : data.getAllSettlements()) {
+            if (settlement.isAdminLocation()) {
+                adminLocations.add(settlement);
+            }
+        }
+
+        if (adminLocations.isEmpty()) {
+            source.sendSuccess(() -> Component.literal("Admin-локаций пока нет."), false);
+            return 1;
+        }
+
+        source.sendSuccess(() -> Component.literal("Admin-локаций: " + adminLocations.size()), false);
+        for (Settlement settlement : adminLocations) {
+            final String line = settlement.getName()
+                    + " | claims=" + settlement.getClaimedChunkCount()
+                    + " | doors=" + (settlement.isGlobalOpenDoors() ? "on" : "off")
+                    + " | containers=" + (settlement.isGlobalOpenContainers() ? "on" : "off")
+                    + " | redstone=" + (settlement.isGlobalUseRedstone() ? "on" : "off")
+                    + " | war=" + (settlement.isAdminWarEligible() ? "on" : "off");
+            source.sendSuccess(() -> Component.literal("- " + line), false);
+        }
+        return 1;
+    }
+
+    private static int setAdminLocationFlag(CommandContext<CommandSourceStack> context, String flagName, boolean enabled) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer actor = source.getPlayerOrException();
+        Settlement settlement = requireAdminLocationByName(context, "settlement");
+        SettlementSavedData data = SettlementSavedData.get(source.getServer());
+
+        if ("doors".equals(flagName)) {
+            settlement.setGlobalOpenDoors(enabled, actor.level().getGameTime());
+        } else if ("containers".equals(flagName)) {
+            settlement.setGlobalOpenContainers(enabled, actor.level().getGameTime());
+        } else if ("redstone".equals(flagName)) {
+            settlement.setGlobalUseRedstone(enabled, actor.level().getGameTime());
+        } else {
+            source.sendFailure(Component.literal("Неизвестный флаг локации: " + flagName));
+            return 0;
+        }
+
+        data.markChanged();
+        source.sendSuccess(
+                () -> Component.literal("Флаг " + flagName + " для admin-локации \"" + settlement.getName() + "\" установлен: " + (enabled ? "ON" : "OFF")),
+                true
+        );
+        return 1;
+    }
+
+    private static int setAdminLocationWarEligible(CommandContext<CommandSourceStack> context, boolean enabled) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer actor = source.getPlayerOrException();
+        Settlement settlement = requireAdminLocationByName(context, "settlement");
+        SettlementSavedData data = SettlementSavedData.get(source.getServer());
+
+        settlement.setAdminWarEligible(enabled, actor.level().getGameTime());
+        data.markChanged();
+
+        source.sendSuccess(
+                () -> Component.literal("War eligibility для admin-локации \"" + settlement.getName() + "\" установлен: " + (enabled ? "ON" : "OFF")),
+                true
+        );
+        return 1;
+    }
+    private static int showCurrentAdminLocation(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayerOrException();
+        SettlementSavedData data = SettlementSavedData.get(source.getServer());
+        ChunkPos chunkPos = new ChunkPos(player.blockPosition());
+        Settlement settlement = data.getSettlementByChunk(player.level(), chunkPos);
+
+        if (settlement == null) {
+            source.sendFailure(Component.literal("Текущий чанк никому не принадлежит."));
+            return 0;
+        }
+
+        if (!settlement.isAdminLocation()) {
+            source.sendFailure(Component.literal("Текущий чанк принадлежит обычному поселению: " + settlement.getName()));
+            return 0;
+        }
+
+        source.sendSuccess(() -> Component.literal("Текущий чанк принадлежит admin-локации: " + settlement.getName()), false);
+        source.sendSuccess(() -> Component.literal("Чанк: " + chunkPos.x + ", " + chunkPos.z), false);
+        source.sendSuccess(() -> Component.literal("Doors: " + (settlement.isGlobalOpenDoors() ? "ON" : "OFF")), false);
+        source.sendSuccess(() -> Component.literal("Containers: " + (settlement.isGlobalOpenContainers() ? "ON" : "OFF")), false);
+        source.sendSuccess(() -> Component.literal("Redstone: " + (settlement.isGlobalUseRedstone() ? "ON" : "OFF")), false);
+        return 1;
+    }
+
+    private static int claimCurrentChunkForAdminLocation(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayerOrException();
+        Settlement settlement = requireAdminLocationByName(context, "settlement");
+
+        ClaimService.claimCurrentChunkForSettlement(player, settlement.getId());
+
+        ChunkPos chunkPos = new ChunkPos(player.blockPosition());
+        source.sendSuccess(
+                () -> Component.literal("Чанк заклеймлен за admin-локацией " + settlement.getName() + ": " + chunkPos.x + ", " + chunkPos.z),
+                true
+        );
+        return 1;
+    }
+
+    private static int unclaimCurrentChunkForAdminLocation(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayerOrException();
+        SettlementSavedData data = SettlementSavedData.get(source.getServer());
+        ChunkPos chunkPos = new ChunkPos(player.blockPosition());
+        Settlement settlement = data.getSettlementByChunk(player.level(), chunkPos);
+
+        if (settlement == null) {
+            source.sendFailure(Component.literal("Текущий чанк никому не принадлежит."));
+            return 0;
+        }
+
+        if (!settlement.isAdminLocation()) {
+            source.sendFailure(Component.literal("Текущий чанк принадлежит обычному поселению: " + settlement.getName()));
+            return 0;
+        }
+
+        ClaimService.adminUnclaimCurrentChunk(player);
+
+        source.sendSuccess(
+                () -> Component.literal("Клейм снят с admin-локации " + settlement.getName() + ": " + chunkPos.x + ", " + chunkPos.z),
+                true
+        );
+        return 1;
+    }
+    private static Settlement requireCurrentAdminLocation(ServerPlayer player) {
+        SettlementSavedData data = SettlementSavedData.get(player.server);
+        Settlement settlement = data.getSettlementByChunk(player.level(), new ChunkPos(player.blockPosition()));
+        if (settlement == null) {
+            throw new IllegalStateException("Текущий чанк никому не принадлежит.");
+        }
+        if (!settlement.isAdminLocation()) {
+            throw new IllegalStateException("Текущий чанк принадлежит обычному поселению: " + settlement.getName());
+        }
+        return settlement;
+    }
+
+    private static int assignCurrentChunkToPlayerInAdminLocation(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer actor = source.getPlayerOrException();
+        ServerPlayer target = EntityArgument.getPlayer(context, "player");
+
+        SettlementSavedData data = SettlementSavedData.get(source.getServer());
+        Settlement settlement = requireCurrentAdminLocation(actor);
+        ChunkPos chunkPos = new ChunkPos(actor.blockPosition());
+        SettlementChunkClaim claim = data.getClaim(actor.level(), chunkPos);
+        if (claim == null || !settlement.getId().equals(claim.getSettlementId())) {
+            throw new IllegalStateException("Текущий чанк не принадлежит admin-локации.");
+        }
+
+        String chunkKey = claim.getChunkKey();
+        SettlementPlot existingPlot = data.getPlotByChunk(actor.level(), chunkPos);
+        if (existingPlot != null && !settlement.getId().equals(existingPlot.getSettlementId())) {
+            throw new IllegalStateException("На текущем чанке найден участок другого поселения.");
+        }
+
+        if (existingPlot != null && !existingPlot.isOwner(target.getUUID())) {
+            existingPlot.removeChunkKey(chunkKey, actor.level().getGameTime());
+            if (existingPlot.isEmpty()) {
+                data.removePlot(existingPlot.getId());
+            } else {
+                data.saveOrUpdatePlot(existingPlot);
+            }
+        }
+
+        SettlementPlot ownerPlot = data.getOrCreatePlotForOwner(settlement.getId(), target.getUUID(), actor.level().getGameTime());
+        ownerPlot.addChunkKey(chunkKey, actor.level().getGameTime());
+        data.saveOrUpdatePlot(ownerPlot);
+
+        source.sendSuccess(
+                () -> Component.literal("Чанк назначен личным участком игрока " + target.getGameProfile().getName() + " в admin-локации \"" + settlement.getName() + "\"."),
+                true
+        );
+        return 1;
+    }
+
+    private static int unassignCurrentChunkInAdminLocation(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer actor = source.getPlayerOrException();
+
+        SettlementSavedData data = SettlementSavedData.get(source.getServer());
+        Settlement settlement = requireCurrentAdminLocation(actor);
+        ChunkPos chunkPos = new ChunkPos(actor.blockPosition());
+        SettlementPlot plot = data.getPlotByChunk(actor.level(), chunkPos);
+
+        if (plot == null) {
+            throw new IllegalStateException("На текущем чанке нет личного участка.");
+        }
+        if (!settlement.getId().equals(plot.getSettlementId())) {
+            throw new IllegalStateException("Этот участок принадлежит другому поселению.");
+        }
+
+        SettlementChunkClaim claim = data.getClaim(actor.level(), chunkPos);
+        if (claim == null) {
+            throw new IllegalStateException("Клейм текущего чанка не найден.");
+        }
+
+        plot.removeChunkKey(claim.getChunkKey(), actor.level().getGameTime());
+        if (plot.isEmpty()) {
+            data.removePlot(plot.getId());
+        } else {
+            data.saveOrUpdatePlot(plot);
+        }
+
+        source.sendSuccess(
+                () -> Component.literal("Текущий чанк admin-локации \"" + settlement.getName() + "\" снова стал общей территорией."),
+                true
+        );
+        return 1;
+    }
+
+    private static int showCurrentAdminLocationPlotInfo(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer actor = source.getPlayerOrException();
+
+        SettlementSavedData data = SettlementSavedData.get(source.getServer());
+        Settlement settlement = requireCurrentAdminLocation(actor);
+        ChunkPos chunkPos = new ChunkPos(actor.blockPosition());
+        SettlementPlot plot = data.getPlotByChunk(actor.level(), chunkPos);
+
+        source.sendSuccess(() -> Component.literal("Admin-локация: " + settlement.getName()), false);
+        source.sendSuccess(() -> Component.literal("Чанк: " + chunkPos.x + ", " + chunkPos.z), false);
+
+        if (plot == null) {
+            source.sendSuccess(() -> Component.literal("На текущем чанке нет личного участка."), false);
+            return 1;
+        }
+
+        if (!settlement.getId().equals(plot.getSettlementId())) {
+            throw new IllegalStateException("На текущем чанке найден участок другого поселения.");
+        }
+
+        source.sendSuccess(() -> Component.literal("==== Личный участок admin-локации ===="), false);
+        source.sendSuccess(() -> Component.literal("Plot ID: " + plot.getId()), false);
+        source.sendSuccess(() -> Component.literal("Settlement ID: " + plot.getSettlementId()), false);
+        source.sendSuccess(() -> Component.literal("Владелец: " + plot.getOwnerUuid()), false);
+        source.sendSuccess(() -> Component.literal("Чанков в участке: " + plot.getChunkKeys().size()), false);
+
+        if (plot.getAccessByPlayer().isEmpty()) {
+            source.sendSuccess(() -> Component.literal("Дополнительных доступов нет."), false);
+            return 1;
+        }
+
+        for (Map.Entry<UUID, PlotPermissionSet> entry : plot.getAccessByPlayer().entrySet()) {
+            final UUID targetUuid = entry.getKey();
+            final PlotPermissionSet permissionSet = entry.getValue();
+
+            source.sendSuccess(() -> Component.literal(
+                    "- Доступ у " + targetUuid + ": " + permissionSet.asReadOnlySet()
+            ), false);
+        }
+
+        return 1;
+    }
+    private static int grantPermissionOnCurrentAdminLocationPlot(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer actor = source.getPlayerOrException();
+        ServerPlayer target = EntityArgument.getPlayer(context, "player");
+        PlotPermission permission = PlotPermission.valueOf(
+                StringArgumentType.getString(context, "permission").toUpperCase(Locale.ROOT)
+        );
+
+        SettlementSavedData data = SettlementSavedData.get(source.getServer());
+        Settlement settlement = requireCurrentAdminLocation(actor);
+        ChunkPos chunkPos = new ChunkPos(actor.blockPosition());
+        SettlementPlot plot = data.getPlotByChunk(actor.level(), chunkPos);
+
+        if (plot == null) {
+            throw new IllegalStateException("На текущем чанке нет личного участка.");
+        }
+
+        if (!settlement.getId().equals(plot.getSettlementId())) {
+            throw new IllegalStateException("Этот участок принадлежит другому поселению.");
+        }
+
+        if (plot.isOwner(target.getUUID())) {
+            throw new IllegalStateException("Владелец участка уже имеет полный доступ.");
+        }
+
+        plot.grantPermission(target.getUUID(), permission, actor.level().getGameTime());
+        data.saveOrUpdatePlot(plot);
+
+        source.sendSuccess(
+                () -> Component.literal(
+                        "Игроку " + target.getGameProfile().getName()
+                                + " выдано локальное право " + permission.name()
+                                + " на текущем участке admin-локации \"" + settlement.getName() + "\"."
+                ),
+                true
+        );
+        return 1;
+    }
+
+    private static int revokePermissionOnCurrentAdminLocationPlot(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer actor = source.getPlayerOrException();
+        ServerPlayer target = EntityArgument.getPlayer(context, "player");
+        PlotPermission permission = PlotPermission.valueOf(
+                StringArgumentType.getString(context, "permission").toUpperCase(Locale.ROOT)
+        );
+
+        SettlementSavedData data = SettlementSavedData.get(source.getServer());
+        Settlement settlement = requireCurrentAdminLocation(actor);
+        ChunkPos chunkPos = new ChunkPos(actor.blockPosition());
+        SettlementPlot plot = data.getPlotByChunk(actor.level(), chunkPos);
+
+        if (plot == null) {
+            throw new IllegalStateException("На текущем чанке нет личного участка.");
+        }
+
+        if (!settlement.getId().equals(plot.getSettlementId())) {
+            throw new IllegalStateException("Этот участок принадлежит другому поселению.");
+        }
+
+        if (plot.isOwner(target.getUUID())) {
+            throw new IllegalStateException("Нельзя снимать права у владельца участка.");
+        }
+
+        plot.revokePermission(target.getUUID(), permission, actor.level().getGameTime());
+        data.saveOrUpdatePlot(plot);
+
+        source.sendSuccess(
+                () -> Component.literal(
+                        "У игрока " + target.getGameProfile().getName()
+                                + " снято локальное право " + permission.name()
+                                + " на текущем участке admin-локации \"" + settlement.getName() + "\"."
+                ),
+                true
+        );
+        return 1;
+    }
     private static LiteralArgumentBuilder<CommandSourceStack> buildCreateNode() {
         return Commands.literal("create")
                 .then(Commands.argument("name", StringArgumentType.greedyString())
@@ -1381,6 +1899,10 @@ public final class SettlementDebugCommands {
                             boolean hadCreateAccess = data.hasSettlementCreateAccess(player.getUUID());
                             if (!hadCreateAccess) {
                                 data.setSettlementCreateAccess(player.getUUID(), true);
+                            }
+
+                            if (!data.hasSettlementFreeClaimAccess(player.getUUID())) {
+                                data.setSettlementFreeClaimAccess(player.getUUID(), true);
                             }
 
                             Settlement settlement = SettlementService.createSettlement(
@@ -1524,7 +2046,223 @@ public final class SettlementDebugCommands {
                                     return 1;
                                 })));
     }
+    private static LiteralArgumentBuilder<CommandSourceStack> buildClaimPriceNode() {
+        return Commands.literal("claimprice")
+                .then(Commands.literal("info")
+                        .executes(context -> {
+                            ServerPlayer player = context.getSource().getPlayerOrException();
+                            SettlementSavedData data = SettlementSavedData.get(context.getSource().getServer());
+                            Settlement settlement = data.getSettlementByPlayer(player.getUUID());
 
+                            if (settlement == null) {
+                                context.getSource().sendFailure(Component.literal("Ты не состоишь в поселении. Укажи название поселения явно."));
+                                return 0;
+                            }
+
+                            return sendClaimPriceInfo(context.getSource(), settlement);
+                        })
+                        .then(Commands.argument("settlement", StringArgumentType.greedyString())
+                                .suggests(SettlementDebugCommands::suggestSettlementNames)
+                                .executes(context -> sendClaimPriceInfo(context.getSource(), requireSettlementByName(context, "settlement")))))
+                .then(Commands.literal("setbaseoffset")
+                        .then(Commands.argument("value", LongArgumentType.longArg())
+                                .executes(context -> {
+                                    ServerPlayer player = context.getSource().getPlayerOrException();
+                                    long value = LongArgumentType.getLong(context, "value");
+                                    SettlementSavedData data = SettlementSavedData.get(context.getSource().getServer());
+                                    Settlement settlement = data.getSettlementByPlayer(player.getUUID());
+
+                                    if (settlement == null) {
+                                        context.getSource().sendFailure(Component.literal("Ты не состоишь в поселении. Укажи название поселения явно."));
+                                        return 0;
+                                    }
+
+                                    settlement.setClaimPriceBaseOffset(value, player.level().getGameTime());
+                                    data.markChanged();
+
+                                    context.getSource().sendSuccess(
+                                            () -> Component.literal("Base offset для \"" + settlement.getName() + "\" установлен: " + value),
+                                            true
+                                    );
+                                    return 1;
+                                })
+                                .then(Commands.argument("settlement", StringArgumentType.greedyString())
+                                        .suggests(SettlementDebugCommands::suggestSettlementNames)
+                                        .executes(context -> {
+                                            ServerPlayer player = context.getSource().getPlayerOrException();
+                                            long value = LongArgumentType.getLong(context, "value");
+                                            Settlement settlement = requireSettlementByName(context, "settlement");
+                                            SettlementSavedData data = SettlementSavedData.get(context.getSource().getServer());
+
+                                            settlement.setClaimPriceBaseOffset(value, player.level().getGameTime());
+                                            data.markChanged();
+
+                                            context.getSource().sendSuccess(
+                                                    () -> Component.literal("Base offset для \"" + settlement.getName() + "\" установлен: " + value),
+                                                    true
+                                            );
+                                            return 1;
+                                        }))))
+                .then(Commands.literal("setstepoffset")
+                        .then(Commands.argument("value", LongArgumentType.longArg())
+                                .executes(context -> {
+                                    ServerPlayer player = context.getSource().getPlayerOrException();
+                                    long value = LongArgumentType.getLong(context, "value");
+                                    SettlementSavedData data = SettlementSavedData.get(context.getSource().getServer());
+                                    Settlement settlement = data.getSettlementByPlayer(player.getUUID());
+
+                                    if (settlement == null) {
+                                        context.getSource().sendFailure(Component.literal("Ты не состоишь в поселении. Укажи название поселения явно."));
+                                        return 0;
+                                    }
+
+                                    settlement.setClaimPriceStepOffset(value, player.level().getGameTime());
+                                    data.markChanged();
+
+                                    context.getSource().sendSuccess(
+                                            () -> Component.literal("Step offset для \"" + settlement.getName() + "\" установлен: " + value),
+                                            true
+                                    );
+                                    return 1;
+                                })
+                                .then(Commands.argument("settlement", StringArgumentType.greedyString())
+                                        .suggests(SettlementDebugCommands::suggestSettlementNames)
+                                        .executes(context -> {
+                                            ServerPlayer player = context.getSource().getPlayerOrException();
+                                            long value = LongArgumentType.getLong(context, "value");
+                                            Settlement settlement = requireSettlementByName(context, "settlement");
+                                            SettlementSavedData data = SettlementSavedData.get(context.getSource().getServer());
+
+                                            settlement.setClaimPriceStepOffset(value, player.level().getGameTime());
+                                            data.markChanged();
+
+                                            context.getSource().sendSuccess(
+                                                    () -> Component.literal("Step offset для \"" + settlement.getName() + "\" установлен: " + value),
+                                                    true
+                                            );
+                                            return 1;
+                                        }))))
+                .then(Commands.literal("setmultiplier")
+                        .then(Commands.argument("value", DoubleArgumentType.doubleArg(0.01D))
+                                .executes(context -> {
+                                    ServerPlayer player = context.getSource().getPlayerOrException();
+                                    double value = DoubleArgumentType.getDouble(context, "value");
+                                    SettlementSavedData data = SettlementSavedData.get(context.getSource().getServer());
+                                    Settlement settlement = data.getSettlementByPlayer(player.getUUID());
+
+                                    if (settlement == null) {
+                                        context.getSource().sendFailure(Component.literal("Ты не состоишь в поселении. Укажи название поселения явно."));
+                                        return 0;
+                                    }
+
+                                    settlement.setClaimPriceMultiplier(value, player.level().getGameTime());
+                                    data.markChanged();
+
+                                    context.getSource().sendSuccess(
+                                            () -> Component.literal("Multiplier для \"" + settlement.getName() + "\" установлен: " + value),
+                                            true
+                                    );
+                                    return 1;
+                                })
+                                .then(Commands.argument("settlement", StringArgumentType.greedyString())
+                                        .suggests(SettlementDebugCommands::suggestSettlementNames)
+                                        .executes(context -> {
+                                            ServerPlayer player = context.getSource().getPlayerOrException();
+                                            double value = DoubleArgumentType.getDouble(context, "value");
+                                            Settlement settlement = requireSettlementByName(context, "settlement");
+                                            SettlementSavedData data = SettlementSavedData.get(context.getSource().getServer());
+
+                                            settlement.setClaimPriceMultiplier(value, player.level().getGameTime());
+                                            data.markChanged();
+
+                                            context.getSource().sendSuccess(
+                                                    () -> Component.literal("Multiplier для \"" + settlement.getName() + "\" установлен: " + value),
+                                                    true
+                                            );
+                                            return 1;
+                                        }))))
+                .then(Commands.literal("settier")
+                        .then(Commands.argument("value", IntegerArgumentType.integer(0))
+                                .executes(context -> {
+                                    ServerPlayer player = context.getSource().getPlayerOrException();
+                                    int value = IntegerArgumentType.getInteger(context, "value");
+                                    SettlementSavedData data = SettlementSavedData.get(context.getSource().getServer());
+                                    Settlement settlement = data.getSettlementByPlayer(player.getUUID());
+
+                                    if (settlement == null) {
+                                        context.getSource().sendFailure(Component.literal("Ты не состоишь в поселении. Укажи название поселения явно."));
+                                        return 0;
+                                    }
+
+                                    settlement.setPaidClaimCount(value, player.level().getGameTime());
+                                    data.markChanged();
+
+                                    context.getSource().sendSuccess(
+                                            () -> Component.literal("Tier цены для \"" + settlement.getName() + "\" установлен: " + value),
+                                            true
+                                    );
+                                    return 1;
+                                })
+                                .then(Commands.argument("settlement", StringArgumentType.greedyString())
+                                        .suggests(SettlementDebugCommands::suggestSettlementNames)
+                                        .executes(context -> {
+                                            ServerPlayer player = context.getSource().getPlayerOrException();
+                                            int value = IntegerArgumentType.getInteger(context, "value");
+                                            Settlement settlement = requireSettlementByName(context, "settlement");
+                                            SettlementSavedData data = SettlementSavedData.get(context.getSource().getServer());
+
+                                            settlement.setPaidClaimCount(value, player.level().getGameTime());
+                                            data.markChanged();
+
+                                            context.getSource().sendSuccess(
+                                                    () -> Component.literal("Tier цены для \"" + settlement.getName() + "\" установлен: " + value),
+                                                    true
+                                            );
+                                            return 1;
+                                        }))))
+                .then(Commands.literal("reset")
+                        .executes(context -> {
+                            ServerPlayer player = context.getSource().getPlayerOrException();
+                            SettlementSavedData data = SettlementSavedData.get(context.getSource().getServer());
+                            Settlement settlement = data.getSettlementByPlayer(player.getUUID());
+
+                            if (settlement == null) {
+                                context.getSource().sendFailure(Component.literal("Ты не состоишь в поселении. Укажи название поселения явно."));
+                                return 0;
+                            }
+
+                            settlement.setClaimPriceBaseOffset(0L, player.level().getGameTime());
+                            settlement.setClaimPriceStepOffset(0L, player.level().getGameTime());
+                            settlement.setClaimPriceMultiplier(1.0D, player.level().getGameTime());
+                            settlement.setPaidClaimCount(0, player.level().getGameTime());
+                            data.markChanged();
+
+                            context.getSource().sendSuccess(
+                                    () -> Component.literal("Настройки цены чанков для \"" + settlement.getName() + "\" сброшены."),
+                                    true
+                            );
+                            return 1;
+                        })
+                        .then(Commands.argument("settlement", StringArgumentType.greedyString())
+                                .suggests(SettlementDebugCommands::suggestSettlementNames)
+                                .executes(context -> {
+                                    ServerPlayer player = context.getSource().getPlayerOrException();
+                                    Settlement settlement = requireSettlementByName(context, "settlement");
+                                    SettlementSavedData data = SettlementSavedData.get(context.getSource().getServer());
+
+                                    settlement.setClaimPriceBaseOffset(0L, player.level().getGameTime());
+                                    settlement.setClaimPriceStepOffset(0L, player.level().getGameTime());
+                                    settlement.setClaimPriceMultiplier(1.0D, player.level().getGameTime());
+                                    settlement.setPaidClaimCount(0, player.level().getGameTime());
+                                    data.markChanged();
+
+                                    context.getSource().sendSuccess(
+                                            () -> Component.literal("Настройки цены чанков для \"" + settlement.getName() + "\" сброшены."),
+                                            true
+                                    );
+                                    return 1;
+                                })));
+    }
     private static LiteralArgumentBuilder<CommandSourceStack> buildPlotNode() {
         return Commands.literal("plot")
                 .then(Commands.literal("assign")
@@ -2147,6 +2885,7 @@ public final class SettlementDebugCommands {
     }
 
     private static Settlement requireSettlementByRawName(CommandSourceStack source, String rawName) {
+
         SettlementSavedData data = SettlementSavedData.get(source.getServer());
         String normalized = normalizeSettlementNameInput(rawName);
         Settlement settlement = data.getSettlementByName(normalized);
@@ -2164,7 +2903,43 @@ public final class SettlementDebugCommands {
 
         throw new IllegalStateException("Поселение \"" + normalized + "\" не найдено.");
     }
+    private static Settlement requireAdminLocationByName(CommandContext<CommandSourceStack> context, String argumentName) {
+        Settlement settlement = requireSettlementByName(context, argumentName);
+        if (!settlement.isAdminLocation()) {
+            throw new IllegalStateException("Это не admin-локация: " + settlement.getName());
+        }
+        return settlement;
+    }
 
+    private static Settlement findSettlementByNormalizedName(SettlementSavedData data, String normalizedName) {
+        if (data == null || normalizedName == null || normalizedName.trim().isEmpty()) {
+            return null;
+        }
+
+        String lowered = normalizedName.trim().toLowerCase(Locale.ROOT);
+        for (Settlement settlement : data.getAllSettlements()) {
+            String currentName = settlement.getName();
+            if (currentName != null && normalizeSettlementNameInput(currentName).toLowerCase(Locale.ROOT).equals(lowered)) {
+                return settlement;
+            }
+        }
+
+        return null;
+    }
+
+    private static CompletableFuture<Suggestions> suggestAdminLocationNames(
+            CommandContext<CommandSourceStack> context,
+            SuggestionsBuilder builder
+    ) {
+        SettlementSavedData data = SettlementSavedData.get(context.getSource().getServer());
+        java.util.List<String> names = new java.util.ArrayList<String>();
+        for (Settlement settlement : data.getAllSettlements()) {
+            if (settlement.isAdminLocation()) {
+                names.add(settlement.getName());
+            }
+        }
+        return SharedSuggestionProvider.suggest(names, builder);
+    }
     private static String normalizeSettlementNameInput(String rawName) {
         if (rawName == null) {
             return "";
@@ -2192,7 +2967,18 @@ public final class SettlementDebugCommands {
                 builder
         );
     }
-
+    private static int sendClaimPriceInfo(CommandSourceStack source, Settlement settlement) {
+        source.sendSuccess(() -> Component.literal("==== Цена чанков ===="), false);
+        source.sendSuccess(() -> Component.literal("Поселение: " + settlement.getName()), false);
+        source.sendSuccess(() -> Component.literal("Клеймов сейчас: " + settlement.getClaimedChunkCount()), false);
+        source.sendSuccess(() -> Component.literal("Купленный лимит чанков: " + settlement.getPurchasedChunkAllowance()), false);
+        source.sendSuccess(() -> Component.literal("Оплачено слотов чанков: " + settlement.getPaidClaimCount()), false);
+        source.sendSuccess(() -> Component.literal("Base offset: " + settlement.getClaimPriceBaseOffset()), false);
+        source.sendSuccess(() -> Component.literal("Step offset: " + settlement.getClaimPriceStepOffset()), false);
+        source.sendSuccess(() -> Component.literal("Multiplier: " + settlement.getClaimPriceMultiplier()), false);
+        source.sendSuccess(() -> Component.literal("Цена следующего слота чанка: " + ClaimService.calculateNextClaimPrice(settlement)), false);
+        return 1;
+    }
 
     private static LiteralArgumentBuilder<CommandSourceStack> buildTransferLeaderNode() {
         return Commands.literal("transferleader")

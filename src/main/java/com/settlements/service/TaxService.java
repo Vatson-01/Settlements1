@@ -65,6 +65,14 @@ public final class TaxService {
     }
 
     public static long calculateSettlementTax(Settlement settlement) {
+        if (settlement == null) {
+            return 0L;
+        }
+
+        if (settlement.isAdminLocation()) {
+            return 0L;
+        }
+
         long landPart = settlement.getTaxConfig().getLandTaxPerClaimedChunk() * settlement.getClaimedChunkCount();
         long residentPart = settlement.getTaxConfig().getResidentTaxPerResident() * settlement.getMembers().size();
         return landPart + residentPart;

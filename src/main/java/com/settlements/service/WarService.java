@@ -26,6 +26,9 @@ public final class WarService {
         Settlement settlementA = requireSettlement(data, settlementAId);
         Settlement settlementB = requireSettlement(data, settlementBId);
 
+        requireWarEligible(settlementA);
+        requireWarEligible(settlementB);
+
         if (settlementA.getId().equals(settlementB.getId())) {
             throw new IllegalArgumentException("Нельзя объявить войну поселению самому себе.");
         }
@@ -81,6 +84,8 @@ public final class WarService {
 
         Settlement attacker = requireSettlement(data, attackerSettlementId);
         Settlement defender = requireSettlement(data, defenderSettlementId);
+        requireWarEligible(attacker);
+        requireWarEligible(defender);
 
         if (attacker.getId().equals(defender.getId())) {
             throw new IllegalArgumentException("Нельзя осаждать собственное поселение.");
@@ -194,7 +199,7 @@ public final class WarService {
             UUID attackerSettlementId,
             UUID defenderSettlementId
     ) {
-        return isActiveSiegeBetween(server, attackerSettlementId, defenderSettlementId);
+        return false;
     }
 
     public static boolean canAttackerBreakClaimedBlockByHand(
@@ -212,7 +217,17 @@ public final class WarService {
     ) {
         return isActiveSiegeBetween(server, attackerSettlementId, defenderSettlementId);
     }
+    private static void requireWarEligible(Settlement settlement) {
+        if (settlement == null) {
+            throw new IllegalArgumentException("Поселение не найдено.");
+        }
 
+        if (!settlement.isWarEligible()) {
+            throw new IllegalStateException(
+                    "Поселение \"" + settlement.getName() + "\" не может участвовать в войне."
+            );
+        }
+    }
     private static Settlement requireSettlement(SettlementSavedData data, UUID settlementId) {
         Settlement settlement = data.getSettlement(settlementId);
         if (settlement == null) {

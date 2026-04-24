@@ -76,6 +76,7 @@ public final class SettlementCommands {
                         .then(buildInfoNode())
                         .then(buildWhereNode())
                         .then(buildClaimNode())
+                        .then(buildFreeClaimNode())
                         .then(buildUnclaimNode())
                         .then(buildPlotNode())
                         .then(buildBordersNode())
@@ -133,6 +134,22 @@ public final class SettlementCommands {
 
     private static boolean canClaimChunksSource(CommandSourceStack source) {
         return hasSettlementPermissionSource(source, SettlementPermission.BUY_CHUNKS);
+    }
+
+    private static boolean canUseFreeClaimSource(CommandSourceStack source) {
+        if (!(source.getEntity() instanceof ServerPlayer)) {
+            return false;
+        }
+
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+        Settlement settlement = getSettlementFromSource(source);
+        if (settlement == null) {
+            return false;
+        }
+
+        SettlementSavedData data = SettlementSavedData.get(player.server);
+        return data.hasSettlementFreeClaimAccess(player.getUUID())
+                && settlement.getClaimedChunkCount() == 0;
     }
 
     private static boolean canUnclaimChunksSource(CommandSourceStack source) {
@@ -299,6 +316,26 @@ public final class SettlementCommands {
                         ChunkPos chunkPos = new ChunkPos(player.blockPosition());
                         context.getSource().sendSuccess(
                                 () -> Component.literal("Чанк заклеймлен: " + chunkPos.x + ", " + chunkPos.z),
+                                true
+                        );
+                        return 1;
+                    }
+                }));
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> buildFreeClaimNode() {
+        return Commands.literal("freeclaim")
+                .requires(SettlementCommands::canUseFreeClaimSource)
+                .executes(context -> runHandled(context, new CommandAction() {
+                    @Override
+                    public int run() throws Exception {
+                        ServerPlayer player = requirePlayer(context);
+                        ClaimService.claimCurrentChunkFree(player);
+                        refreshCommandTrees(player.server, player);
+
+                        ChunkPos chunkPos = new ChunkPos(player.blockPosition());
+                        context.getSource().sendSuccess(
+                                () -> Component.literal("Бесплатный первый чанк заклеймлен: " + chunkPos.x + ", " + chunkPos.z),
                                 true
                         );
                         return 1;
@@ -1109,6 +1146,8 @@ public final class SettlementCommands {
                                 player.getUUID()
                         );
 
+                        refreshCommandTrees(player.server, player);
+
                         context.getSource().sendSuccess(
                                 () -> Component.literal("Поселение распущено."),
                                 true
@@ -1136,6 +1175,14 @@ public final class SettlementCommands {
         }
 
         source.sendSuccess(() -> Component.literal("Поселение: " + settlement.getName()), false);
+        source.sendSuccess(() -> Component.literal("Тип поселения: " + settlement.getType().name()), false);
+
+        if (settlement.isAdminLocation()) {
+            source.sendSuccess(() -> Component.literal("Глобальные флаги локации:"), false);
+            source.sendSuccess(() -> Component.literal("- Doors: " + (settlement.isGlobalOpenDoors() ? "ON" : "OFF")), false);
+            source.sendSuccess(() -> Component.literal("- Containers: " + (settlement.isGlobalOpenContainers() ? "ON" : "OFF")), false);
+            source.sendSuccess(() -> Component.literal("- Redstone: " + (settlement.isGlobalUseRedstone() ? "ON" : "OFF")), false);
+        }
 
         if (plot == null) {
             source.sendSuccess(() -> Component.literal("Тип территории: общая территория поселения."), false);
@@ -1207,6 +1254,8 @@ public final class SettlementCommands {
         source.sendSuccess(() -> Component.literal("Жителей: " + settlement.getMembers().size()), false);
         source.sendSuccess(() -> Component.literal("Клеймов: " + settlement.getClaimedChunkCount()), false);
         source.sendSuccess(() -> Component.literal("Лимит купленных чанков: " + settlement.getPurchasedChunkAllowance()), false);
+        source.sendSuccess(() -> Component.literal("Оплачено слотов чанков: " + settlement.getPaidClaimCount()), false);
+        source.sendSuccess(() -> Component.literal("Цена следующего слота чанка: " + ClaimService.calculateNextClaimPrice(settlement)), false);
 
         SettlementMember self = settlement.getMember(actorUuid);
         if (self != null && canViewTreasuryBalance(settlement, self, source.getPlayer())) {

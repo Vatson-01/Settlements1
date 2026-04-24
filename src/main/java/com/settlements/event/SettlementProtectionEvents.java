@@ -44,6 +44,10 @@ public final class SettlementProtectionEvents {
             return;
         }
 
+        if (hasAdminLocationOverride(player, event.getPos())) {
+            return;
+        }
+
         if (PermissionService.canPerform(player, event.getPos(), ProtectedAction.BREAK_BLOCK)) {
             return;
         }
@@ -61,6 +65,10 @@ public final class SettlementProtectionEvents {
     @SubscribeEvent
     public static void onPlaceBlock(BlockEvent.EntityPlaceEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) {
+            return;
+        }
+
+        if (hasAdminLocationOverride(player, event.getPos())) {
             return;
         }
 
@@ -92,6 +100,10 @@ public final class SettlementProtectionEvents {
             return;
         }
 
+        if (hasAdminLocationOverride(player, event.getPos())) {
+            return;
+        }
+
         if (isPublicAccess(player, event.getPos(), action)) {
             return;
         }
@@ -108,9 +120,32 @@ public final class SettlementProtectionEvents {
         event.setCancellationResult(InteractionResult.FAIL);
         player.displayClientMessage(Component.literal("У тебя нет доступа к этому участку."), true);
     }
+    private static boolean hasAdminLocationOverride(ServerPlayer player, BlockPos pos) {
+        if (player == null || !player.hasPermissions(2)) {
+            return false;
+        }
 
+        SettlementSavedData data = SettlementSavedData.get(player.server);
+        Settlement settlement = data.getSettlementByChunk(player.level(), new ChunkPos(pos));
+        return settlement != null && settlement.isAdminLocation();
+    }
     private static boolean isPublicAccess(ServerPlayer player, BlockPos pos, ProtectedAction action) {
         SettlementSavedData data = SettlementSavedData.get(player.server);
+        Settlement settlement = data.getSettlementByChunk(player.level(), new ChunkPos(pos));
+
+        if (settlement != null) {
+            if (action == ProtectedAction.OPEN_DOOR && settlement.isGlobalOpenDoors()) {
+                return true;
+            }
+
+            if (action == ProtectedAction.USE_REDSTONE && settlement.isGlobalUseRedstone()) {
+                return true;
+            }
+
+            if (action == ProtectedAction.OPEN_CONTAINER && settlement.isGlobalOpenContainers()) {
+                return true;
+            }
+        }
 
         if (action == ProtectedAction.OPEN_DOOR) {
             return data.isPublicDoor(player.level(), pos);
